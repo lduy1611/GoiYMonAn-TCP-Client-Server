@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }}</title><link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark">✦</span><span>Hôm nay ăn gì?</span></div><span class="status-pill" id="server-status">Đang kiểm tra server…</span></header>
+  <main class="container">
+    <section class="hero"><p class="eyebrow">Gợi ý theo căn bếp của bạn</p><h1>Bữa nay, mình ăn gì nhỉ?</h1><p class="hero-copy">Chọn nguyên liệu đang có, phần còn thiếu sẽ được giải thích rõ ràng.</p></section>
+    <section class="workspace">
+      <aside class="panel controls">
+        <h2>Nguyên liệu</h2><label class="search"><span>⌕</span><input id="ingredient-search" placeholder="Tìm trứng, cà chua…" autocomplete="off"></label>
+        <div id="ingredient-results" class="ingredient-results"></div><div class="selected-heading"><span>Đã chọn</span><span id="selected-count">0/30</span></div><div id="selected-ingredients" class="chips empty">Chưa có nguyên liệu nào</div>
+        <div class="filter-grid"><label>Thời gian tối đa<input id="max-minutes" type="number" min="1" max="240" placeholder="Không giới hạn"><small>phút</small></label><label>Top món<input id="top-k" type="number" min="1" max="20" value="5"></label></div>
+        <div class="selected-heading exclusion-heading"><span>Loại trừ</span><span class="hint">Bấm ⊘ trên chip đã chọn</span></div><div id="excluded-ingredients" class="chips empty">Chưa loại trừ nguyên liệu nào</div>
+        <button id="recommend-button" class="primary" disabled>Gợi ý món ăn <span>→</span></button>
+      </aside>
+      <section class="results-area"><div class="results-heading"><div><p class="eyebrow">Kết quả phù hợp</p><h2>Món ngon dành cho bạn</h2></div><span id="result-count" class="result-count"></span></div><div id="message" class="message hidden"></div><div id="loading" class="loading hidden"><span class="spinner"></span>Đang tìm món phù hợp…</div><div id="results" class="recipe-grid"></div><div id="empty-state" class="empty-state"><div class="empty-illustration">🍲</div><h3>Hãy chọn vài nguyên liệu</h3><p>Chúng tôi sẽ tìm những món có thể nấu ngay hôm nay.</p></div></section>
+    </section>
+  </main>
+  <footer>Gợi ý mang tính tham khảo · Kiểm tra thành phần và dị ứng trước khi sử dụng</footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
