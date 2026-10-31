@@ -1,7 +1,9 @@
 import socket
 import threading
 
-from source.common.protocol import encode_frame, recv_frame
+import pytest
+
+from source.common.protocol import ProtocolError, encode_frame, recv_frame
 
 
 def test_coalesced_frames_and_utf8():
@@ -27,3 +29,40 @@ def test_header_can_arrive_one_byte_at_a_time():
         assert value == {"ok": True}
     finally:
         left.close(); right.close()
+
+
+@pytest.mark.parametrize("wire", [b"\x00", b"\x00\x00\x00", b"\x00\x00\x00\x05", b"\x00\x00\x00\x05{"])
+def test_eof_during_frame_is_truncated(wire):
+    left, right = socket.socketpair()
+    try:
+        left.sendall(wire)
+        left.shutdown(socket.SHUT_WR)
+        with pytest.raises(ProtocolError) as error:
+            recv_frame(right)
+        assert error.value.code == "TRUNCATED_FRAME"
+    finally:
+        left.close()
+        right.close()
+
+
+def test_eof_between_frames_is_clean():
+    left, right = socket.socketpair()
+    left.close()
+    try:
+        assert recv_frame(right) == (None, 0)
+    finally:
+        right.close()
+
+
+@pytest.mark.parametrize("wire", [b"", b"\x00", b"\x00\x00\x00\x05", b"\x00\x00\x00\x05{"])
+def test_idle_or_incomplete_frame_has_read_deadline(wire):
+    left, right = socket.socketpair()
+    try:
+        if wire:
+            left.sendall(wire)
+        with pytest.raises(ProtocolError) as error:
+            recv_frame(right, timeout=0.05)
+        assert error.value.code == "TIMEOUT"
+    finally:
+        left.close()
+        right.close()

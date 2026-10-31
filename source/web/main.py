@@ -37,7 +37,7 @@ def http_status_for_error(code: str) -> int:
         return 404
     if code == "TIMEOUT":
         return 504
-    if code in {"UPSTREAM_PROTOCOL", "UNKNOWN_OPERATION", "UNSUPPORTED_VERSION", "MALFORMED_FRAME", "FRAME_LENGTH"}:
+    if code in {"UPSTREAM_PROTOCOL", "UNKNOWN_OPERATION", "UNSUPPORTED_VERSION", "MALFORMED_FRAME", "FRAME_LENGTH", "TRUNCATED_FRAME"}:
         return 502
     return 503
 
@@ -78,6 +78,8 @@ def call_tcp(request: Request, op: str, payload: dict[str, Any]) -> JSONResponse
     if response["ok"] is False:
         error = response.get("error") or {}
         code = error.get("code", "INTERNAL_ERROR") if isinstance(error, dict) else "INTERNAL_ERROR"
+        if code == "NOT_FOUND" and op == "GET_RECIPE":
+            response = error_response(request_id, code, "Không tìm thấy món ăn với mã đã yêu cầu.")
         return JSONResponse(response, status_code=http_status_for_error(code), headers={"X-Request-ID": request_id})
     if response.get("data") is None or response.get("error") is not None:
         response = error_response(request_id, "UPSTREAM_PROTOCOL", "TCP Server trả về response không hợp lệ.")
