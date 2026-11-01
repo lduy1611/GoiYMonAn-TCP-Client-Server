@@ -1,5 +1,7 @@
 # Implementation summary
 
+Historical implementation summary for phases 1–4 and the submitted report. The operation counts and test results below describe that milestone. For the current five-operation/UI v1.2.3 demo, use the [README](README.md) and [document index](docs/README.md). No historical measurements have been updated to current results.
+
 ## Scope
 
 This project implements the “Hệ thống gợi ý món ăn sử dụng TCP Client–Server” with a TCP JSON protocol, a MySQL-backed server repository, a FastAPI Web gateway, and a Vietnamese Web interface. Phase 4 adds a non-destructive Vietnamese recipe dataset and reproducible experiment scripts.
@@ -39,9 +41,9 @@ Current audit evidence:
 
 - Dataset hash: `c97ab2c7d127be738efc9c97c2e299bea5af69e7c3884757fd09814fbfb3fcdf`
 - Code hash: `fa4a3309b3c844480fd2e08ffd15f61aaa8c700ebc81af9cf578e2fe78fbc028`
-- Audit log: [phase4_dataset_audit.log](statics/results/phase4_dataset_audit.log)
+- Local audit log: `statics/results/phase4_dataset_audit.log` (not distributed); the recorded [JSON audit](statics/results/phase4_dataset_audit.json) is available.
 
-The final audit and experiment artifacts are recorded in [phase4_dataset_audit.log](statics/results/phase4_dataset_audit.log), [e2_run_20261029_114105.log](statics/results/e2_run_20261029_114105.log), [e2_raw_20261029_114105.csv](statics/results/e2_raw_20261029_114105.csv), [e2_summary_20261029_114105.csv](statics/results/e2_summary_20261029_114105.csv) and [EXPERIMENT_RESULTS.md](EXPERIMENT_RESULTS.md).
+The final audit and experiment artifacts are recorded in [phase4_dataset_audit.json](statics/results/phase4_dataset_audit.json), [e2_raw_20261029_114105.csv](statics/results/e2_raw_20261029_114105.csv), [e2_summary_20261029_114105.csv](statics/results/e2_summary_20261029_114105.csv) and [EXPERIMENT_RESULTS.md](EXPERIMENT_RESULTS.md). Associated local logs `statics/results/phase4_dataset_audit.log` and `statics/results/e2_run_20261029_114105.log` are not distributed by Git; they are not required to run the demo.
 
 ## Phase 4 experiment commands
 

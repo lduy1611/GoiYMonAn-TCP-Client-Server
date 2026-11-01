@@ -12,12 +12,16 @@ from pathlib import Path
 from typing import Any
 
 import mysql.connector
+from dotenv import load_dotenv
 
 from source.common.protocol import ProtocolError, encode_frame, error_response, recv_frame
 from source.server.handler import dispatch
 from source.server.repository import MySQLRepository, Repository
 
-LOG_PATH = Path(os.getenv("TCP_LOG_PATH", "statics/results/tcp_server.jsonl"))
+# Read TCP settings before import-time constants and main() startup arguments.
+# Explicit process variables take precedence over the repository's local .env.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+LOG_PATH = Path(os.getenv("TCP_LOG_PATH", "statics/runtime/tcp_server.jsonl"))
 
 
 class TCPServer:

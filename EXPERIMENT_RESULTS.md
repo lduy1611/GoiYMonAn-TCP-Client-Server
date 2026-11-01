@@ -2,6 +2,8 @@
 
 Date of analysis: 2026-10-29
 
+This is historical report evidence, not the current demo setup. Use the [current README](README.md) and [document index](docs/README.md) for UI v1.2.3 and current test results. Historical `.log` files named below are not distributed by Git; names identify local evidence only. Recorded CSV/JSON/charts remain available in this repository. Missing log downloads do not mean the experiment was rerun or its measurements changed.
+
 This document analyzes the recorded CSV and log files only. No benchmark value was edited or recomputed in the source CSV. The application algorithm and dataset were not changed during analysis.
 
 ## Official E2 measurement
@@ -10,8 +12,8 @@ The following is the official E2 run produced by [benchmark_e2.py](scripts/bench
 
 - Raw evidence: [e2_raw_20261029_114105.csv](statics/results/e2_raw_20261029_114105.csv)
 - Summary evidence: [e2_summary_20261029_114105.csv](statics/results/e2_summary_20261029_114105.csv)
-- Run log: [e2_run_20261029_114105.log](statics/results/e2_run_20261029_114105.log)
-- Uvicorn log: [e2_uvicorn_20261029_114105.log](statics/results/e2_uvicorn_20261029_114105.log)
+- Local run log (not distributed): `statics/results/e2_run_20261029_114105.log`; recorded raw/summary CSVs are linked above.
+- Local Uvicorn log (not distributed): `statics/results/e2_uvicorn_20261029_114105.log`; no downloadable HTTP server log is supplied here.
 - Charts: [e2_20261029_114105_charts.png](statics/results/e2_20261029_114105_charts.png)
 
 Raw integrity checks:
@@ -79,7 +81,7 @@ The dataset audit independently confirms 50 ingredients, 50 recipes, 252 `recipe
 - Dataset SHA-256: `c97ab2c7d127be738efc9c97c2e299bea5af69e7c3884757fd09814fbfb3fcdf`
 - Code SHA-256: `fa4a3309b3c844480fd2e08ffd15f61aaa8c700ebc81af9cf578e2fe78fbc028`
 - Dataset audit: [phase4_dataset_audit.json](statics/results/phase4_dataset_audit.json)
-- Dataset audit log: [phase4_dataset_audit.log](statics/results/phase4_dataset_audit.log)
+- Local dataset audit log (not distributed): `statics/results/phase4_dataset_audit.log`; the recorded JSON audit is linked above.
 
 ## Configuration and method
 
@@ -95,7 +97,7 @@ The dataset audit independently confirms 50 ingredients, 50 recipes, 252 `recipe
 
 ## Historical preliminary TCP benchmark (superseded by official E2 above)
 
-Source: [benchmark_tcp.csv](statics/results/benchmark_tcp.csv) and [benchmark_tcp.log](statics/results/benchmark_tcp.log).
+Source: [benchmark_tcp.csv](statics/results/benchmark_tcp.csv). Associated local log: `statics/results/benchmark_tcp.log` (not distributed).
 
 | Concurrent clients | Requests | Success | Failed | Error rate | P50 (ms) | P95 (ms) | Throughput (req/s) | Status |
 |---:|---:|---:|---:|---:|---:|---:|---:|:---|
@@ -114,7 +116,7 @@ Charts generated directly from the CSV:
 
 ## B0 versus P1 comparison
 
-Source: [algorithm_comparison.csv](statics/results/algorithm_comparison.csv) and [algorithm_comparison.log](statics/results/algorithm_comparison.log).
+Source: [algorithm_comparison.csv](statics/results/algorithm_comparison.csv). Associated local log: `statics/results/algorithm_comparison.log` (not distributed).
 
 The recorded columns measure: scenario, input ingredient IDs, algorithm name, request status, number of returned items, returned recipe ID order, server-computed ranking scores and one-request elapsed time. They do not contain human relevance labels.
 
@@ -136,8 +138,8 @@ These rows demonstrate that B0 and P1 can return different orderings and score s
 
 ## Test results associated with the experiment
 
-- Full suite: **16 passed, 0 failed, 0 skipped**; see [phase4_final_dataset_pytest.log](statics/results/phase4_final_dataset_pytest.log).
-- Focused MySQL/Web suite: **5 passed, 0 failed, 0 skipped**; see [phase4_mysql_web_pytest.log](statics/results/phase4_mysql_web_pytest.log).
+- Full suite: **16 passed, 0 failed, 0 skipped**; historical local log `statics/results/phase4_final_dataset_pytest.log` is not distributed. This retains the reported result, not a new execution verified from the clone.
+- Focused MySQL/Web suite: **5 passed, 0 failed, 0 skipped**; historical local log `statics/results/phase4_mysql_web_pytest.log` is not distributed. Current test commands and results are in the [README](README.md).
 - The focused suite covers MySQL PING, LIST_INGREDIENTS, GET_RECIPE, RECOMMEND, ten concurrent TCP clients, FastAPI TCP routing and HTTP 503 during TCP outage.
 
 ## Experiments still missing versus TEST_PLAN.md
