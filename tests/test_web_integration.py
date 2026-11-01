@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from source.client.tcp_client import TCPClientError
 from source.database.seed import seed
 from source.server.main import TCPServer
 from source.web.main import app
@@ -86,3 +87,29 @@ def test_web_page_and_validation(web_with_tcp):
     overlap = client.post("/api/recommend", json={"ingredient_ids": [1], "excluded_ids": [1]})
     assert overlap.status_code == 422
     assert overlap.json()["error"]["code"] == "INVALID_PAYLOAD"
+
+
+def test_missing_recipe_is_404_with_correlated_error(web_with_tcp):
+    client, _, _ = web_with_tcp
+    response = client.get("/api/recipes/999999")
+    assert response.status_code == 404
+    envelope = response.json()
+    assert envelope["version"] == 1
+    assert envelope["ok"] is False
+    assert envelope["data"] is None
+    assert envelope["request_id"] == response.headers["x-request-id"]
+    assert envelope["error"] == {"code": "NOT_FOUND", "message": "Không tìm thấy món ăn với mã đã yêu cầu."}
+    assert client.get("/api/recipes/1").status_code == 200
+    assert client.get("/api/health").status_code == 200
+
+
+@pytest.mark.parametrize("code,status", [("TRUNCATED_FRAME", 502), ("TIMEOUT", 504)])
+def test_web_maps_incomplete_or_timed_out_tcp_response(monkeypatch, code, status):
+    def fail_request(*_args, **_kwargs):
+        raise TCPClientError(code)
+    monkeypatch.setattr("source.web.main.TCPClient.request", fail_request)
+    with TestClient(app) as client:
+        response = client.get("/api/recipes/1")
+    assert response.status_code == status
+    assert response.json()["error"]["code"] == code
+    assert response.json()["request_id"] == response.headers["x-request-id"]

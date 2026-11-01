@@ -7,6 +7,7 @@ from typing import Any
 from source.common.protocol import ProtocolError, error_response, success_response, validate_request
 from source.server.ranking import rank_recipes
 from source.server.repository import Repository
+from source.server.search import search_recipes, validate_search
 
 
 def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
@@ -33,6 +34,12 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
                 raise ProtocolError("NOT_FOUND", "recipe not found", request_id)
             recipe["dataset_version"] = version
             return success_response(request_id, recipe), op
+        if op == "SEARCH_RECIPES":
+            options = validate_search(payload, request_id)
+            if not repository.ingredient_ids_exist(connection, options.selected | options.excluded):
+                raise ProtocolError("INVALID_PAYLOAD", "ingredient ids are invalid", request_id)
+            data = search_recipes(repository.recipes_for_ranking(connection), options)
+            return success_response(request_id, {"dataset_version": version, **data}), op
         unknown = set(payload) - {"ingredient_ids", "excluded_ids", "max_minutes", "top_k", "algorithm"}
         selected = payload.get("ingredient_ids")
         excluded = payload.get("excluded_ids", [])

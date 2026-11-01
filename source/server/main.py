@@ -12,12 +12,16 @@ from pathlib import Path
 from typing import Any
 
 import mysql.connector
+from dotenv import load_dotenv
 
 from source.common.protocol import ProtocolError, encode_frame, error_response, recv_frame
 from source.server.handler import dispatch
 from source.server.repository import MySQLRepository, Repository
 
-LOG_PATH = Path(os.getenv("TCP_LOG_PATH", "statics/results/tcp_server.jsonl"))
+# Read TCP settings before import-time constants and main() startup arguments.
+# Explicit process variables take precedence over the repository's local .env.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+LOG_PATH = Path(os.getenv("TCP_LOG_PATH", "statics/runtime/tcp_server.jsonl"))
 
 
 class TCPServer:
@@ -74,11 +78,14 @@ class TCPServer:
                         self._log(request_id=response["request_id"], op=op, connection_id=connection_id, outcome="ok", error_code=None, receive_ms=0, service_ms=round((time.monotonic() - started) * 1000, 3), send_ms=0, bytes_in=bytes_in, bytes_out=len(frame), dataset_version=response.get("data", {}).get("dataset_version"))
                     except ProtocolError as exc:
                         self._log(request_id=exc.request_id, op=None, connection_id=connection_id, outcome="error", error_code=exc.code, receive_ms=0, service_ms=round((time.monotonic() - started) * 1000, 3), send_ms=0, bytes_in=0, bytes_out=0, dataset_version=None)
-                        if exc.code in {"UNKNOWN_OPERATION", "INVALID_PAYLOAD"} and exc.request_id:
-                            client.sendall(encode_frame(error_response(exc.request_id, exc.code, exc.message)))
-                            continue
-                        if exc.code in {"INVALID_REQUEST", "UNSUPPORTED_VERSION"}:
-                            client.sendall(encode_frame(error_response(exc.request_id, exc.code, exc.message)))
+                        recoverable = exc.code in {"UNKNOWN_OPERATION", "INVALID_PAYLOAD", "NOT_FOUND"} and exc.request_id is not None
+                        if recoverable or exc.code in {"INVALID_REQUEST", "UNSUPPORTED_VERSION"}:
+                            try:
+                                client.sendall(encode_frame(error_response(exc.request_id, exc.code, exc.message)))
+                            except OSError:
+                                return
+                            if recoverable:
+                                continue
                         return
                     except (sqlite3.Error, mysql.connector.Error):
                         request_id = request.get("request_id") if isinstance(request, dict) else None

@@ -3,6 +3,8 @@
 Date: 2026-10-29  
 Scope: phase 3 database migration
 
+Historical migration record. The 15-ingredient/10-recipe fixture and commands below describe phase 3, not a fresh setup of the current 50-recipe demo. Follow the [current README](README.md) for all four MySQL SQL files and runtime account setup. Do not rerun migration/seed against an existing database to follow this history. See the [document index](docs/README.md) for current and historical material.
+
 ## 1. Source SQLite structure
 
 The preserved `data/recipes.db` contains five tables:
@@ -73,8 +75,10 @@ tests/test_mysql_integration.py::test_mysql_multiclient_and_http_outage PASSED
 
 The MySQL integration tests exercised PING, LIST_INGREDIENTS, GET_RECIPE, RECOMMEND, ten concurrent TCP clients, and FastAPI HTTP 503 after the TCP Server was stopped. Static import audit found no MySQL/SQLite repository or ranking references in the Web or TCP Client packages. The SQLite database remains preserved for regression/rollback comparison.
 
-Logs:
+Historical local logs (not distributed by Git; not download links):
 
-- [phase3_runtime_backend.log](statics/results/phase3_runtime_backend.log)
-- [phase3_migration_pytest.log](statics/results/phase3_migration_pytest.log)
-- [phase3_mysql_integration.log](statics/results/phase3_mysql_integration.log)
+- `statics/results/phase3_runtime_backend.log`
+- `statics/results/phase3_migration_pytest.log`
+- `statics/results/phase3_mysql_integration.log`
+
+The reported results above are preserved as historical statements; their complete log files cannot be independently read from a fresh clone. The later 50-recipe dataset has a tracked [phase 4 JSON audit](statics/results/phase4_dataset_audit.json), which is separate evidence and does not replace the phase 3 logs.

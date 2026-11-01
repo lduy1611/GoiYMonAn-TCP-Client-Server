@@ -12,7 +12,7 @@ MAX_FRAME_SIZE = 65536
 PROTOCOL_VERSION = 1
 READ_DEADLINE = 5.0
 CLIENT_TOTAL_BUDGET = 7.0
-SUPPORTED_OPS = {"PING", "LIST_INGREDIENTS", "GET_RECIPE", "RECOMMEND"}
+SUPPORTED_OPS = {"PING", "LIST_INGREDIENTS", "GET_RECIPE", "RECOMMEND", "SEARCH_RECIPES"}
 
 
 class ProtocolError(Exception):
@@ -88,7 +88,8 @@ def recv_frame(sock: socket.socket, timeout: float = READ_DEADLINE) -> tuple[dic
     if not 1 <= length <= MAX_FRAME_SIZE:
         raise ProtocolError("FRAME_LENGTH", "frame length outside 1..65536")
     body = recv_exact(sock, length, deadline)
-    assert body is not None
+    if body is None:
+        raise ProtocolError("TRUNCATED_FRAME", "connection closed before frame body")
     try:
         value = json.loads(body.decode("utf-8"), object_pairs_hook=_no_duplicate_keys, parse_constant=_reject_constant)
         if not isinstance(value, dict) or _depth(value) > 16:

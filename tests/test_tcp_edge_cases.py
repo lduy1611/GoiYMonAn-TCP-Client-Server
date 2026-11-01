@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from source.client.tcp_client import TCPClient, TCPClientError
-from source.common.protocol import encode_frame
+from source.common.protocol import ProtocolError, encode_frame, recv_frame
 from source.database.seed import seed
 from source.server.main import TCPServer
 
@@ -35,12 +35,14 @@ def running_server(tmp_path: Path):
     pytest.fail("TCP server did not start")
 
 
-def test_timeout_closes_slow_client_and_server_survives(tmp_path: Path):
+@pytest.mark.parametrize("wire", [b"\x00", b"\x00\x00\x00\x05", b"\x00\x00\x00\x05{"])
+def test_timeout_closes_slow_client_and_server_survives(tmp_path: Path, wire):
     server, port, thread = running_server(tmp_path)
     client = socket.create_connection(("127.0.0.1", port), timeout=1)
     started = time.monotonic()
     try:
-        client.sendall(b"\x00")
+        client.sendall(wire)
+        assert TCPClient(port=port).request("PING", {})["ok"] is True
         client.settimeout(7)
         assert client.recv(1) == b""
         assert 4.5 <= time.monotonic() - started < 7
@@ -107,3 +109,115 @@ def _read_frame(connection: socket.socket):
     while len(body) < length:
         body.extend(connection.recv(length - len(body)))
     return json.loads(body), 4 + length
+
+
+def test_missing_recipe_returns_error_and_keeps_connection(tmp_path: Path):
+    server, port, thread = running_server(tmp_path)
+    client = TCPClient(port=port, persistent=True)
+    request_id = "4a7f6d4a-f3be-4fdb-b8a8-4d1ec2c32d10"
+    try:
+        response = client.request("GET_RECIPE", {"recipe_id": 999999}, request_id=request_id)
+        assert response == {"version": 1, "request_id": request_id, "ok": False, "data": None,
+                            "error": {"code": "NOT_FOUND", "message": "recipe not found"}}
+        original_socket = client.sock
+        assert client.request("GET_RECIPE", {"recipe_id": 1})["data"]["id"] == 1
+        assert client.request("PING", {})["ok"] is True
+        assert client.sock is original_socket
+    finally:
+        client.close()
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("wire", [b"", b"\x00", b"\x00\x00\x00\x05", b"\x00\x00\x00\x05{"])
+def test_eof_or_truncated_request_releases_handler(tmp_path: Path, wire):
+    server, port, thread = running_server(tmp_path)
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1) as client:
+            if wire:
+                client.sendall(wire)
+            client.shutdown(socket.SHUT_WR)
+            assert client.recv(1) == b""
+        assert TCPClient(port=port).request("PING", {})["ok"] is True
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("code", ["UNKNOWN_OPERATION", "INVALID_PAYLOAD", "INVALID_REQUEST", "UNSUPPORTED_VERSION", "NOT_FOUND"])
+@pytest.mark.parametrize("send_error", [ConnectionResetError, BrokenPipeError])
+def test_disconnect_while_sending_error_releases_slot(monkeypatch, code, send_error):
+    # Deterministic send failure: an OS close/reset is otherwise timing dependent.
+    from unittest.mock import MagicMock
+    import source.server.main as server_module
+
+    server = TCPServer(repository=object(), max_connections=1)
+    request_id = "4a7f6d4a-f3be-4fdb-b8a8-4d1ec2c32d10"
+    def reject(*_args):
+        raise ProtocolError(code, "rejected", request_id)
+    monkeypatch.setattr(server_module, "recv_frame", lambda _client: ({}, 4))
+    monkeypatch.setattr(server_module, "dispatch", reject)
+    client = MagicMock()
+    client.sendall.side_effect = send_error("peer disconnected")
+    assert server.slots.acquire(blocking=False)
+    server._handle(client, None)
+    assert server.slots.acquire(blocking=False)
+    server.slots.release()
+    client.sendall.assert_called_once()
+
+
+@pytest.mark.parametrize("wire,expected", [
+    (b"", "UPSTREAM_PROTOCOL"),
+    (b"\x00", "TRUNCATED_FRAME"),
+    (b"\x00\x00\x00\x05", "TRUNCATED_FRAME"),
+    (b"\x00\x00\x00\x05{", "TRUNCATED_FRAME"),
+    (encode_frame({"request_id": "wrong"}), "UPSTREAM_PROTOCOL"),
+])
+def test_persistent_client_discards_broken_socket_and_reconnects(monkeypatch, wire, expected):
+    first, upstream = socket.socketpair()
+    second, recovered_upstream = socket.socketpair()
+    client = TCPClient(persistent=True)
+    request_id = "4a7f6d4a-f3be-4fdb-b8a8-4d1ec2c32d10"
+    sockets = iter((first, second))
+    monkeypatch.setattr(socket, "create_connection", lambda *_args, **_kwargs: next(sockets))
+    try:
+        if wire:
+            upstream.sendall(wire)
+        upstream.shutdown(socket.SHUT_WR)
+        with pytest.raises(TCPClientError, match=expected):
+            client.request("PING", {}, request_id=request_id)
+        assert client.sock is None
+        assert first.fileno() == -1
+        recovered_upstream.sendall(encode_frame({"version": 1, "request_id": request_id,
+                                               "ok": True, "data": {"status": "ok"}, "error": None}))
+        assert client.request("PING", {}, request_id=request_id)["ok"] is True
+    finally:
+        client.close()
+        first.close()
+        second.close()
+        upstream.close()
+        recovered_upstream.close()
+
+
+@pytest.mark.parametrize("failure,expected", [
+    (ProtocolError("TIMEOUT", "frame read deadline exceeded"), "TIMEOUT"),
+    (ConnectionResetError("peer reset"), "UPSTREAM_UNAVAILABLE"),
+])
+def test_persistent_client_closes_socket_on_timeout_or_reset(monkeypatch, failure, expected):
+    import source.client.tcp_client as client_module
+
+    local, upstream = socket.socketpair()
+    client = TCPClient(persistent=True)
+    monkeypatch.setattr(socket, "create_connection", lambda *_args, **_kwargs: local)
+    def fail_receive(*_args, **_kwargs):
+        raise failure
+    monkeypatch.setattr(client_module, "recv_frame", fail_receive)
+    try:
+        with pytest.raises(TCPClientError, match=expected):
+            client.request("PING", {})
+        assert client.sock is None
+        assert local.fileno() == -1
+    finally:
+        client.close()
+        local.close()
+        upstream.close()

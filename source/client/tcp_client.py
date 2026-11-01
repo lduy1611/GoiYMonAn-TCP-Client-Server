@@ -35,9 +35,14 @@ class TCPClient:
                 raise TCPClientError("UPSTREAM_PROTOCOL")
             return response
         except (OSError, TimeoutError) as exc:
+            self.close()
             raise TCPClientError("UPSTREAM_UNAVAILABLE") from exc
         except ProtocolError as exc:
+            self.close()
             raise TCPClientError(exc.code) from exc
+        except TCPClientError:
+            self.close()
+            raise
         finally:
             if not self.persistent and sock is not None:
                 sock.close()
