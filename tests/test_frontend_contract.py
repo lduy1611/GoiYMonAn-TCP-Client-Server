@@ -60,3 +60,14 @@ def test_both_pages_use_matching_versioned_assets_and_focusable_skip_targets():
             versions.add(version[0])
         assert any(attrs.get("id") == target and attrs.get("tabindex") == "-1" for _, attrs in parsed.elements)
     assert len(versions) == 1
+
+
+def test_advanced_filter_disclosure_has_a_single_labeled_target():
+    home = page("index.html")
+    toggle = next(attrs for tag, attrs in home.elements if attrs.get("id") == "advanced-toggle")
+    assert toggle["type"] == "button"
+    assert toggle["aria-expanded"] in {"false", "true"}
+    assert toggle["aria-controls"] == "ingredient-panel"
+    assert home.ids.count(toggle["aria-controls"]) == 1
+    region = next(attrs for _, attrs in home.elements if attrs.get("id") == "ingredient-panel")
+    assert region["role"] == "region" and region["aria-labelledby"] in home.ids

@@ -1,7 +1,7 @@
 const state = {
   available: new Map(), excluded: new Map(), ingredients: new Map(),
   visible: [], busy: false, searchVersion: 0, datasetVersion: null, view: null,
-  mode: 'recommend', offset: 0
+  mode: 'recommend', offset: 0, advancedOpen: false
 };
 const $ = id => document.getElementById(id);
 const storageKey = 'goiy-selection-v1';
@@ -41,7 +41,8 @@ function saveSelection() {
         mode: state.mode, recipeQuery: $('recipe-query').value,
         maxMissing: $('max-missing').value, limit: $('search-limit').value, offset: state.offset
       },
-      view: state.view, searchQuery: $('ingredient-search').value, scrollY: window.scrollY
+      view: state.view, searchQuery: $('ingredient-search').value, scrollY: window.scrollY,
+      advancedOpen: state.advancedOpen
     }));
   } catch {
     // Do not leave an older snapshot available after a failed write (e.g. quota).
@@ -102,6 +103,7 @@ function restoreSelection() {
           !(conditions.maxMissing === '' || validNumber(conditions.maxMissing, 50, 0)) ||
           !validNumber(conditions.limit, 20) || !Number.isSafeInteger(conditions.offset) || conditions.offset < 0)) throw Error('Invalid conditions');
     state.mode = mode;
+    state.advancedOpen = saved.advancedOpen === true;
     state.offset = mode === 'search' ? conditions.offset : 0;
     state.available = new Map(conditions.available.map(id => [id, state.ingredients.get(id)]));
     state.excluded = new Map(conditions.excluded.map(id => [id, state.ingredients.get(id)]));
@@ -210,8 +212,30 @@ function selectionChanged() {
   invalidateResults();
 }
 
+function syncAdvanced() {
+  const searching = state.mode === 'search';
+  const expanded = !searching || state.advancedOpen;
+  const panel = $('ingredient-panel');
+  const toggle = $('advanced-toggle');
+  if (!expanded && panel.contains(document.activeElement)) toggle.focus({preventScroll: true});
+  toggle.classList.toggle('hidden', !searching);
+  toggle.disabled = state.busy;
+  toggle.setAttribute('aria-expanded', String(expanded));
+  panel.classList.toggle('hidden', !expanded);
+  panel.classList.toggle('advanced-content', searching);
+  $('advanced-summary').textContent = 'Có sẵn: ' + state.available.size + ' • Loại trừ: ' + state.excluded.size;
+}
+
 function syncMode() {
   const searching = state.mode === 'search';
+  const slot = $(searching ? 'search-filter-slot' : 'recommend-filter-slot');
+  if ($('basic-filters').parentElement !== slot) slot.appendChild($('basic-filters'));
+  $('recommend-form').setAttribute('aria-labelledby', searching ? 'search-title' : 'controls-title');
+  $('hero-title').innerHTML = searching ? 'Bạn muốn nấu<br>món gì hôm nay?' : 'Có nguyên liệu gì,<br>mình nấu món đó.';
+  $('hero-copy').textContent = searching ? 'Tìm công thức theo tên. Thêm bộ lọc khi cần, không cần chọn nguyên liệu để bắt đầu.' : 'Chọn những gì bạn đang có. Tìm món phù hợp và biết rõ cần chuẩn bị thêm gì.';
+  const steps = searching ? ['Nhập tên món', 'Lọc theo sở thích', 'Xem cách nấu'] : ['Chọn nguyên liệu', 'Tìm món phù hợp', 'Xem cách nấu'];
+  $('journey').innerHTML = steps.map((step, index) => '<li><span>' + (index + 1) + '</span> ' + step + '</li>').join('');
+  syncAdvanced();
   $('search-fields').classList.toggle('hidden', !searching);
   $('search-limit-field').classList.toggle('hidden', !searching);
   $('recommend-limit-field').classList.toggle('hidden', searching);
@@ -383,6 +407,12 @@ for (const mode of ['search', 'recommend']) {
 }
 $('page-prev').onclick = event => recommend(event, Math.max(0, state.offset - Number($('search-limit').value)));
 $('page-next').onclick = event => recommend(event, state.offset + Number($('search-limit').value));
+$('advanced-toggle').onclick = () => {
+  if (state.busy) return;
+  state.advancedOpen = !state.advancedOpen;
+  syncAdvanced();
+  saveSelection();
+};
 let timer;
 $('ingredient-search').addEventListener('input', event => {
   clearTimeout(timer);

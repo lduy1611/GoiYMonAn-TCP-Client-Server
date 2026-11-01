@@ -20,6 +20,7 @@ let session;
 const pending = new Map();
 const pageErrors = [];
 const posts = [];
+const apiRequests = [];
 let legacyCss;
 const send = (method, params = {}, sessionId = session) => new Promise((resolve, reject) => {
   const id = ++serial;
@@ -62,6 +63,7 @@ try {
       pageErrors.push(message.params.args.map(arg => arg.value ?? arg.description).join(' '));
     }
     if (message.method === 'Network.requestWillBeSent' && message.params.request.method === 'POST') posts.push(message.params.request);
+    if (message.method === 'Network.requestWillBeSent' && message.params.request.url.startsWith(baseUrl + '/api/')) apiRequests.push(message.params.request);
   };
   const {targetId} = await send('Target.createTarget', {url: 'about:blank'}, null);
   session = (await send('Target.attachToTarget', {targetId, flatten: true}, null)).sessionId;
@@ -340,13 +342,27 @@ try {
   assert.equal(await evaluate('document.getElementById("excluded-count").textContent'), '0/30');
   if (width < 760) { await resize(320); await noOverflow(); await resize(width); }
   // v1.2: server-side name search without ingredient selection.
+  const beforeSearchModeRequests = apiRequests.length;
   await click('#mode-search');
   assert.equal(await evaluate('document.getElementById("recommend-button").disabled'), false);
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false');
+  assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
+  assert.equal(await evaluate('document.getElementById("advanced-summary").textContent'), 'Có sẵn: 0 • Loại trừ: 0');
+  assert.equal(await evaluate('document.getElementById("max-minutes").closest("#search-filter-slot") !== null'), true);
+  assert.equal(apiRequests.length, beforeSearchModeRequests, 'Switching mode must not send an HTTP request');
+  await noOverflow();
+  await screenshot('search-collapsed-' + width);
+  if (width < 760) { await resize(320); await noOverflow(); await screenshot('search-collapsed-320'); await resize(width); }
   await input('max-minutes', '');
   for (const query of ['đậu phụ', 'dau phu', 'ĐẬU PHỤ'.normalize('NFD')]) {
     await input('recipe-query', query);
-    await click('#recommend-button');
+    const beforeSearchPosts = posts.length;
+    if (query === 'đậu phụ') {
+      await click('#recipe-query');
+      await key('Enter', 'Enter', 13);
+    } else await click('#recommend-button');
     await wait('document.querySelectorAll(".recipe-card").length === 1');
+    assert.equal(posts.length, beforeSearchPosts + 1, 'Enter/click must submit exactly one request');
     assert.equal(await evaluate('document.querySelector(".recipe-card h3").textContent'), 'Đậu phụ sốt cà chua');
     assert.equal(await evaluate('document.querySelectorAll(".recipe-card .score").length'), 0, 'Search must not invent a P1 score');
     const request = JSON.parse(posts.at(-1).postData);
@@ -359,6 +375,7 @@ try {
   await back();
   assert.equal(await evaluate('document.getElementById("selected-count").textContent'), '0/30');
   assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 1, 'Search cache with zero selected ingredients must restore');
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false', 'Back must restore the collapsed panel');
   await input('recipe-query', '');
   await input('search-limit', '2');
   await click('#recommend-button');
@@ -377,12 +394,32 @@ try {
   await input('max-minutes', '20');
   await input('max-missing', '0');
   await input('search-limit', '1');
+  const beforeDisclosureRequests = apiRequests.length;
+  await click('#advanced-toggle');
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true');
+  assert.notEqual(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
+  await key('Enter', 'Enter', 13);
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false');
+  await send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
+  await key(' ', 'Space', 32);
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true');
+  assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).animationDuration'), '0s');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".advanced-chevron")).transitionDuration'), '0s');
+  await send('Emulation.setEmulatedMedia', {features: []});
+  assert.equal(apiRequests.length, beforeDisclosureRequests, 'Opening/closing filters must not fetch or submit');
   await click('[data-select="1"]');
   await click('[data-select="2"]');
   await click('[data-exclude="7"]');
+  assert.equal(await evaluate('document.getElementById("advanced-summary").textContent'), 'Có sẵn: 2 • Loại trừ: 1');
+  await screenshot('search-expanded-' + width);
+  if (width < 760) { await resize(320); await noOverflow(); await screenshot('search-expanded-320'); await resize(width); }
+  await click('#advanced-toggle');
+  assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
   await click('#recommend-button');
   await wait('document.querySelectorAll(".recipe-card").length === 1');
   assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/1');
+  assert.deepEqual(JSON.parse(posts.at(-1).postData).ingredient_ids, [1, 2]);
+  assert.deepEqual(JSON.parse(posts.at(-1).postData).excluded_ids, [7]);
   await click('#page-next');
   await wait('document.getElementById("page-label").textContent === "Trang 2 / 2"');
   assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/3');
@@ -396,9 +433,24 @@ try {
   assert.equal(await evaluate('document.getElementById("max-missing").value'), '0');
   assert.equal(await evaluate('document.getElementById("page-label").textContent'), 'Trang 2 / 2');
   assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/3');
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false');
   const searchSnapshot = await evaluate('sessionStorage.getItem("goiy-selection-v1")');
   await reloadHome();
   assert.equal(await evaluate('document.getElementById("page-label").textContent'), 'Trang 2 / 2');
+  assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
+  const beforeOpenRequests = apiRequests.length;
+  await click('#advanced-toggle');
+  assert.equal(apiRequests.length, beforeOpenRequests);
+  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 1, 'Opening filters must retain valid results');
+  await click('.detail-link');
+  await wait('document.querySelector(".detail-heading h1") !== null');
+  await back();
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true', 'Back must restore the open panel');
+  assert.equal(await evaluate('document.getElementById("page-label").textContent'), 'Trang 2 / 2');
+  await reloadHome();
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true', 'Reload must restore the open panel');
+  assert.equal(await evaluate('document.getElementById("advanced-summary").textContent'), 'Có sẵn: 2 • Loại trừ: 1');
+  await click('#advanced-toggle');
   const wrongSearch = JSON.parse(searchSnapshot);
   wrongSearch.conditions.recipeQuery = 'dau phu';
   await reloadWithSnapshot(JSON.stringify(wrongSearch));
@@ -411,6 +463,19 @@ try {
   await input('recipe-query', 'đậu phụ');
   assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
   assert.equal(await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1")).conditions.offset'), 0);
+  const beforeModeSwitchRequests = apiRequests.length;
+  for (let cycle = 0; cycle < 4; cycle++) {
+    await click('#mode-recommend');
+    assert.notEqual(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
+    assert.equal(await evaluate('getComputedStyle(document.getElementById("advanced-toggle")).display'), 'none');
+    assert.equal(await evaluate('document.getElementById("max-minutes").closest("#recommend-filter-slot") !== null'), true);
+    await click('#mode-search');
+    assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
+    assert.equal(await evaluate('document.getElementById("selected-count").textContent'), '2/30');
+    assert.equal(await evaluate('document.getElementById("excluded-count").textContent'), '1/30');
+    assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
+  }
+  assert.equal(apiRequests.length, beforeModeSwitchRequests, 'Repeated mode switches must not create API calls');
   await click('#mode-recommend');
   await click('#recommend-button');
   await wait('document.querySelectorAll(".recipe-card .score").length > 0');

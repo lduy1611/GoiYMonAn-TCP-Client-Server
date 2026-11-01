@@ -45,6 +45,14 @@ a { color: var(--green); text-underline-offset: 4px; }
 .mode-switch button, .pagination button { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--green); padding: 10px 16px; font-weight: 650; }
 .mode-switch button[aria-pressed="true"] { background: var(--green); color: #fff; border-color: var(--green); }
 .recipe-query { width: 100%; min-width: 0; border: 1px solid #cbd5c8; border-radius: 10px; background: #fbfcf9; padding: 12px; font-size: 16px; color: var(--ink); }
+.advanced-toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 64px; margin-top: 22px; padding: 12px 14px; text-align: left; background: #f4f8f0; border: 1px solid #d6e1cf; border-radius: 12px; color: var(--green-dark); }
+.advanced-label { display: block; font-size: 14px; font-weight: 700; }
+.advanced-summary { display: block; margin-top: 3px; font-size: 12px; color: var(--muted); }
+.advanced-chevron { flex-shrink: 0; font-size: 22px; transition: transform .16s ease; }
+.advanced-toggle[aria-expanded="true"] .advanced-chevron { transform: rotate(180deg); }
+.ingredient-panel.advanced-content { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.advanced-content:not(.hidden) { animation: reveal-advanced .16s ease; }
+@keyframes reveal-advanced { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; font-size: 13px; }
 .panel, .recipe-card { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
 .controls { padding: 24px; }
@@ -172,4 +180,4 @@ footer { text-align: center; color: var(--muted); border-top: 1px solid var(--li
   .journey li { gap: 5px; }
   .results-heading h2 { font-size: 27px; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
