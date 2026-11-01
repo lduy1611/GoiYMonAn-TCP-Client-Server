@@ -59,6 +59,18 @@ def test_mysql_tcp_operations(mysql_server):
     recommendation = client.request("RECOMMEND", {"ingredient_ids": [1, 2], "top_k": 5})
     assert recommendation["data"]["algorithm"] == "proposed"
     assert recommendation["data"]["items"]
+    search = client.request("SEARCH_RECIPES", {"query": "pho"})
+    assert search["ok"] and search["data"]["items"]
+    assert search["data"]["total"] == client.request("SEARCH_RECIPES", {"query": "Phở"})["data"]["total"]
+    assert all("score" not in item for item in search["data"]["items"])
+    import unicodedata
+    accented = client.request("SEARCH_RECIPES", {"query": unicodedata.normalize("NFD", "ĐẬU")})["data"]
+    assert accented["total"] == client.request("SEARCH_RECIPES", {"query": "dau"})["data"]["total"]
+    with TestClient(app) as web:
+        response = web.post("/api/search", json={"query": "pho", "limit": 1})
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == response.json()["request_id"]
+    assert response.json()["data"]["total"] == search["data"]["total"]
 
 
 def test_mysql_multiclient_and_http_outage(mysql_server):

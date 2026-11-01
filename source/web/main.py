@@ -10,14 +10,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
 from source.client.tcp_client import TCPClient, TCPClientError
 from source.common.protocol import error_response
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-app = FastAPI(title="Hôm nay ăn gì?", version="phase-2")
+app = FastAPI(title="Hôm nay ăn gì?", version="1.2.0")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
@@ -28,6 +28,17 @@ class RecommendRequest(BaseModel):
     max_minutes: StrictInt | None = Field(default=None, ge=1, le=240)
     top_k: StrictInt = Field(default=5, ge=1, le=20)
     algorithm: Literal["baseline", "proposed"] = "proposed"
+
+
+class SearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: StrictStr = Field(default="", max_length=80)
+    ingredient_ids: list[StrictInt] = Field(default_factory=list, max_length=30)
+    excluded_ids: list[StrictInt] = Field(default_factory=list, max_length=30)
+    max_minutes: StrictInt | None = Field(default=None, ge=1, le=240)
+    max_missing: StrictInt | None = Field(default=None, ge=0, le=50)
+    limit: StrictInt = Field(default=12, ge=1, le=20)
+    offset: StrictInt = Field(default=0, ge=0)
 
 
 def http_status_for_error(code: str) -> int:
@@ -114,6 +125,13 @@ def recommend(request: Request, body: RecommendRequest):
 @app.get("/api/recipes/{recipe_id}")
 def recipe_detail(request: Request, recipe_id: int = FastAPIPath(ge=1)):
     return call_tcp(request, "GET_RECIPE", {"recipe_id": recipe_id})
+
+
+@app.post("/api/search")
+def search(request: Request, body: SearchRequest):
+    if any(item <= 0 for item in body.ingredient_ids + body.excluded_ids) or set(body.ingredient_ids) & set(body.excluded_ids):
+        return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Mã nguyên liệu không hợp lệ hoặc trùng với nhóm loại trừ."), status_code=422)
+    return call_tcp(request, "SEARCH_RECIPES", body.model_dump(exclude_none=True))
 
 
 @app.get("/api/health")

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page_title }}</title>
-  <link rel="stylesheet" href="/static/styles.css?v=ui-1.1.2">
+  <link rel="stylesheet" href="/static/styles.css?v=ui-1.2.0">
 </head>
 <body>
   <a class="skip-link" href="#recommend-form">Đến phần chọn nguyên liệu</a>
@@ -19,10 +19,21 @@
       <p class="hero-copy">Chọn những gì bạn đang có. Tìm món phù hợp và biết rõ cần chuẩn bị thêm gì.</p>
       <ol class="journey" aria-label="Cách sử dụng"><li><span>1</span> Chọn nguyên liệu</li><li><span>2</span> Tìm món phù hợp</li><li><span>3</span> Xem cách nấu</li></ol>
     </section>
+    <div class="mode-switch" role="group" aria-label="Cách tìm món">
+      <button type="button" id="mode-search" aria-pressed="false">Tìm món theo tên</button>
+      <button type="button" id="mode-recommend" aria-pressed="true">Gợi ý theo nguyên liệu</button>
+    </div>
     <section class="workspace">
       <form id="recommend-form" class="panel controls" aria-labelledby="controls-title" tabindex="-1">
         <fieldset id="ingredient-controls">
           <legend class="sr-only">Nguyên liệu và bộ lọc</legend>
+          <div id="search-fields" class="hidden">
+            <label class="field-label" for="recipe-query">Tên món ăn</label>
+            <input class="recipe-query" id="recipe-query" type="search" maxlength="80" placeholder="Ví dụ: phở, pho, đậu phụ…" disabled>
+            <label class="field-label" for="max-missing">Thiếu tối đa nguyên liệu bắt buộc</label>
+            <input class="recipe-query" id="max-missing" type="number" min="0" max="50" step="1" placeholder="Không giới hạn" disabled>
+            <p class="field-help">Không cần chọn nguyên liệu để tìm món. Nếu chưa chọn, toàn bộ nguyên liệu bắt buộc được tính là còn thiếu.</p>
+          </div>
           <div class="section-title"><div><p class="eyebrow">Bắt đầu từ căn bếp</p><h2 id="controls-title">Bạn đang có gì?</h2></div><button id="clear-selection" class="text-button" type="button" disabled>Xóa chọn</button></div>
           <label class="field-label" for="ingredient-search">Tìm nguyên liệu</label>
           <div class="search"><span aria-hidden="true">⌕</span><input id="ingredient-search" type="search" placeholder="Nhập tên nguyên liệu…" autocomplete="off" aria-describedby="ingredient-help"></div>
@@ -31,7 +42,7 @@
           <p id="selection-feedback" class="field-help" role="status"></p>
           <section class="selection-group" aria-labelledby="available-title"><div class="selected-heading"><h3 id="available-title">Có sẵn</h3><span id="selected-count">0/30</span></div><div id="selected-ingredients" class="chips empty">Chưa chọn nguyên liệu</div></section>
           <section class="selection-group" aria-labelledby="excluded-title"><div class="selected-heading"><h3 id="excluded-title">Loại trừ</h3><span id="excluded-count">0/30</span></div><p class="field-help">Món có chứa những nguyên liệu này sẽ không được gợi ý.</p><div id="excluded-ingredients" class="chips empty">Không loại trừ nguyên liệu nào</div></section>
-          <div class="filter-grid"><label for="max-minutes">Thời gian tối đa (phút)<input id="max-minutes" type="number" min="1" max="240" step="1" placeholder="Không giới hạn"></label><label for="top-k">Số món gợi ý<input id="top-k" type="number" min="1" max="20" step="1" value="5" required></label></div>
+          <div class="filter-grid"><label for="max-minutes">Thời gian tối đa (phút)<input id="max-minutes" type="number" min="1" max="240" step="1" placeholder="Không giới hạn"></label><label id="recommend-limit-field" for="top-k">Số món gợi ý<input id="top-k" type="number" min="1" max="20" step="1" value="5" required></label><label id="search-limit-field" class="hidden" for="search-limit">Số món mỗi trang<input id="search-limit" type="number" min="1" max="20" step="1" value="12" required disabled></label></div>
           <button id="recommend-button" type="submit" class="primary" disabled><span>Tìm món phù hợp</span><span aria-hidden="true">→</span></button>
           <p class="submit-help" id="submit-help">Chọn ít nhất 1 nguyên liệu có sẵn để bắt đầu.</p>
         </fieldset>
@@ -42,11 +53,12 @@
         <div id="message" class="message error hidden" role="alert"></div>
         <div id="loading" class="loading panel hidden" role="status"><span class="spinner" aria-hidden="true"></span>Đang tìm món phù hợp…</div>
         <div id="results" class="recipe-grid"></div>
+        <nav id="pagination" class="pagination hidden" aria-label="Trang kết quả tìm kiếm"><button type="button" id="page-prev">← Trang trước</button><span id="page-label" role="status"></span><button type="button" id="page-next">Trang sau →</button></nav>
         <div id="empty-state" class="empty-state panel"><div class="empty-illustration" aria-hidden="true">✦</div><h3>Bữa ngon bắt đầu từ đây</h3><p>Chọn nguyên liệu ở bên cạnh rồi bấm “Tìm món phù hợp”.</p></div>
       </section>
     </section>
   </main>
   <footer>Gợi ý mang tính tham khảo · Kiểm tra thành phần và dị ứng trước khi sử dụng</footer>
-  <script src="/static/app.js?v=ui-1.1.2" defer></script>
+  <script src="/static/app.js?v=ui-1.2.0" defer></script>
 </body>
 </html>

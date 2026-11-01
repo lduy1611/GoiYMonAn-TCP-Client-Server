@@ -291,6 +291,16 @@ try {
   }
   await reloadWithSnapshot(validSnapshot);
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'), savedTitles);
+  const legacySnapshot = JSON.parse(validSnapshot);
+  legacySnapshot.version = 2;
+  const legacyConditions = legacySnapshot.conditions;
+  legacySnapshot.conditions = {available: legacyConditions.available, excluded: legacyConditions.excluded,
+    maxMinutes: legacyConditions.maxMinutes, topK: legacyConditions.topK};
+  legacySnapshot.view.signature = JSON.stringify({ingredient_ids: [...legacyConditions.available].sort((a,b)=>a-b),
+    excluded_ids: [...legacyConditions.excluded].sort((a,b)=>a-b), top_k: Number(legacyConditions.topK),
+    algorithm: 'proposed', max_minutes: legacyConditions.maxMinutes === '' ? null : Number(legacyConditions.maxMinutes)});
+  await reloadWithSnapshot(JSON.stringify(legacySnapshot));
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'), savedTitles, 'v1.1.2 cache must upgrade without losing results');
   // Native form validation blocks an invalid filter before any POST.
   const beforeInvalid = posts.length;
   await input('top-k', '21');
@@ -329,6 +339,82 @@ try {
   assert.equal(await evaluate('document.getElementById("recommend-button").disabled'), true);
   assert.equal(await evaluate('document.getElementById("excluded-count").textContent'), '0/30');
   if (width < 760) { await resize(320); await noOverflow(); await resize(width); }
+  // v1.2: server-side name search without ingredient selection.
+  await click('#mode-search');
+  assert.equal(await evaluate('document.getElementById("recommend-button").disabled'), false);
+  await input('max-minutes', '');
+  for (const query of ['đậu phụ', 'dau phu', 'ĐẬU PHỤ'.normalize('NFD')]) {
+    await input('recipe-query', query);
+    await click('#recommend-button');
+    await wait('document.querySelectorAll(".recipe-card").length === 1');
+    assert.equal(await evaluate('document.querySelector(".recipe-card h3").textContent'), 'Đậu phụ sốt cà chua');
+    assert.equal(await evaluate('document.querySelectorAll(".recipe-card .score").length'), 0, 'Search must not invent a P1 score');
+    const request = JSON.parse(posts.at(-1).postData);
+    assert.ok(posts.at(-1).url.endsWith('/api/search'));
+    assert.deepEqual(request.ingredient_ids, []);
+    assert.equal(request.max_missing, null);
+  }
+  await click('.detail-link');
+  await wait('document.querySelector(".detail-heading h1") !== null');
+  await back();
+  assert.equal(await evaluate('document.getElementById("selected-count").textContent'), '0/30');
+  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 1, 'Search cache with zero selected ingredients must restore');
+  await input('recipe-query', '');
+  await input('search-limit', '2');
+  await click('#recommend-button');
+  await wait('document.querySelectorAll(".recipe-card").length === 2');
+  assert.equal(await evaluate('document.getElementById("result-count").textContent'), '10 món · 2 trên trang');
+  await click('#page-next');
+  await wait('document.getElementById("page-label").textContent === "Trang 2 / 5"');
+  assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/3');
+  await click('#page-prev');
+  await wait('document.getElementById("page-label").textContent === "Trang 1 / 5"');
+  await input('recipe-query', 'khong-co-mon-nay');
+  await click('#recommend-button');
+  await wait('document.getElementById("result-count").textContent === "0 món · 0 trên trang"');
+  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
+  await input('recipe-query', 'trung');
+  await input('max-minutes', '20');
+  await input('max-missing', '0');
+  await input('search-limit', '1');
+  await click('[data-select="1"]');
+  await click('[data-select="2"]');
+  await click('[data-exclude="7"]');
+  await click('#recommend-button');
+  await wait('document.querySelectorAll(".recipe-card").length === 1');
+  assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/1');
+  await click('#page-next');
+  await wait('document.getElementById("page-label").textContent === "Trang 2 / 2"');
+  assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/3');
+  await screenshot('search-' + width);
+  if (width < 760) { await resize(320); await noOverflow(); await screenshot('search-320'); await resize(width); }
+  await click('.detail-link');
+  await wait('document.querySelector(".detail-heading h1") !== null');
+  await back();
+  assert.equal(await evaluate('document.getElementById("mode-search").getAttribute("aria-pressed")'), 'true');
+  assert.equal(await evaluate('document.getElementById("recipe-query").value'), 'trung');
+  assert.equal(await evaluate('document.getElementById("max-missing").value'), '0');
+  assert.equal(await evaluate('document.getElementById("page-label").textContent'), 'Trang 2 / 2');
+  assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/3');
+  const searchSnapshot = await evaluate('sessionStorage.getItem("goiy-selection-v1")');
+  await reloadHome();
+  assert.equal(await evaluate('document.getElementById("page-label").textContent'), 'Trang 2 / 2');
+  const wrongSearch = JSON.parse(searchSnapshot);
+  wrongSearch.conditions.recipeQuery = 'dau phu';
+  await reloadWithSnapshot(JSON.stringify(wrongSearch));
+  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
+  const wrongPage = JSON.parse(searchSnapshot);
+  wrongPage.conditions.offset = 0;
+  await reloadWithSnapshot(JSON.stringify(wrongPage));
+  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0, 'Cached items for another page must not render');
+  await reloadWithSnapshot(searchSnapshot);
+  await input('recipe-query', 'đậu phụ');
+  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
+  assert.equal(await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1")).conditions.offset'), 0);
+  await click('#mode-recommend');
+  await click('#recommend-button');
+  await wait('document.querySelectorAll(".recipe-card .score").length > 0');
+  await noOverflow();
   await navigate('/recipes/999999');
   await wait('document.querySelector("[role=alert]") !== null');
   assert.ok(await evaluate('document.querySelector("[role=alert]").textContent.includes("Không tìm thấy")'));

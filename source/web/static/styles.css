@@ -41,6 +41,11 @@ a { color: var(--green); text-underline-offset: 4px; }
 .journey li { display: flex; align-items: center; gap: 8px; }
 .journey span { display: grid; place-items: center; background: #e6ecdf; width: 25px; height: 25px; border-radius: 50%; color: var(--green-dark); font-size: 11px; font-weight: 700; }
 .workspace { display: grid; grid-template-columns: minmax(310px, 360px) minmax(0, 1fr); gap: 28px; align-items: start; margin-top: 12px; }
+.mode-switch { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 0 0 28px; }
+.mode-switch button, .pagination button { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--green); padding: 10px 16px; font-weight: 650; }
+.mode-switch button[aria-pressed="true"] { background: var(--green); color: #fff; border-color: var(--green); }
+.recipe-query { width: 100%; min-width: 0; border: 1px solid #cbd5c8; border-radius: 10px; background: #fbfcf9; padding: 12px; font-size: 16px; color: var(--ink); }
+.pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; font-size: 13px; }
 .panel, .recipe-card { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
 .controls { padding: 24px; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }

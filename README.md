@@ -13,6 +13,8 @@ Web dùng socket TCP thật, không truy cập database hoặc chạy ranking tr
 - P1 (`proposed`): `0.7 * coverage + 0.3 * input_use`.
 - Giao diện mặc định dùng P1, có trang chi tiết công thức và trạng thái tải/lỗi/rỗng.
 
+v1.2 bổ sung chế độ **Tìm món theo tên** qua TCP `SEARCH_RECIPES` và HTTP `POST /api/search`: tìm có dấu/không dấu không cần chọn nguyên liệu, lọc thời gian/loại trừ/số nguyên liệu bắt buộc thiếu, phân trang và khôi phục kết quả khi Back/reload. Chế độ RECOMMEND và B0/P1 giữ nguyên. Xem [hợp đồng, giới hạn và hướng dẫn kiểm tra v1.2](docs/V1_2_SEARCH.md). Không cần nạp lại database để dùng tính năng này.
+
 ## 1. Yêu cầu
 
 - Python 3.11 trở lên; bằng chứng kiểm thử hiện có dùng **Python 3.13.7 trên Windows**. Các phiên bản khác chưa được xác minh trong project này.
