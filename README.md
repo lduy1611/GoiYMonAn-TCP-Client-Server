@@ -35,10 +35,10 @@ v1.2 bổ sung chế độ **Tìm món theo tên** qua TCP `SEARCH_RECIPES` và 
 
 ## 2. Clone và cài dependency
 
-Clone đúng nhánh chứa UI v1.2.3. Nhánh mặc định `main` là mốc cũ; không cần merge hoặc đổi tag báo cáo để demo nhánh này:
+Nhánh mặc định `main` chứa phiên bản demo UI v1.2.3. Clone repository để lấy bản demo hiện tại:
 
 ```powershell
-git clone --branch feature/v1.1-improvements https://github.com/lduy1611/GoiYMonAn-TCP-Client-Server.git
+git clone https://github.com/lduy1611/GoiYMonAn-TCP-Client-Server.git
 cd GoiYMonAn-TCP-Client-Server
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
@@ -174,13 +174,22 @@ Ngày 29/10/2026: full suite **16 passed**; focused MySQL/Web **5 passed**, có 
 
 ## 7. Bằng chứng báo cáo và giới hạn
 
-- Commit báo cáo: `4a2afc1`; tag `v1.0-report` giữ mốc đã nộp. Phiên bản demo v1.2.3 ở nhánh `feature/v1.1-improvements`; không thay đổi mốc báo cáo hoặc `main` để chạy demo.
+- Phiên bản demo hiện tại UI v1.2.3 ở nhánh `main`. Commit báo cáo `4a2afc1` và tag `v1.0-report` giữ bản đã nộp ban đầu, không phải bản demo mới nhất.
 - [EXPERIMENT_RESULTS.md](EXPERIMENT_RESULTS.md) phân tích thực nghiệm; CSV, JSON audit và biểu đồ ở [statics/results/](statics/results/).
 - E2 cuối: `e2_raw_20261029_114105.csv` và `e2_summary_20261029_114105.csv`, 7.560 dòng raw, 24 summary PASS theo file lưu. Các lần trước, kể cả lần lỗi, được giữ lại.
 - E2 đo loopback trên một máy. Script hiện tính cả warmup trong mẫu số throughput; chưa thể diễn giải như throughput chỉ đo pha measured. Log `receive_ms`/`send_ms` hiện bằng 0.
 - B0/P1 chưa có nhãn relevance độc lập, P@5/nDCG@5 hoặc đánh giá A1; chưa chứng minh thuật toán nào tốt hơn. Chủ project đã xác nhận thủ công B2 qua điện thoại Wi-Fi; chưa có xác nhận kiểm tra lại B3 trên điện thoại vật lý, bằng chứng Wireshark hoặc tái lập máy hoàn toàn sạch. Kiểm tra chức năng Wi-Fi không phải benchmark LAN.
 - Script benchmark, audit và vẽ biểu đồ có thể tạo/ghi đè artifact. Không cần chạy chúng để dùng ứng dụng; không chạy lại trên đường dẫn bằng chứng báo cáo. Các file `.log` lịch sử bị Git bỏ qua: tài liệu chỉ ghi tên và giới hạn bằng chứng khi không phân phối file, không tạo log giả hoặc suy ra đã tái lập.
 - `SPEC.md`/`TEST_PLAN.md` được tài liệu cũ nhắc đến nhưng chưa có trong repository. Xem thêm [MIGRATION_REPORT.md](MIGRATION_REPORT.md), [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md), [CHANGES_FROM_SPEC.md](CHANGES_FROM_SPEC.md).
+
+Nếu cần truy xuất bản báo cáo ban đầu, clone tag vào **thư mục riêng** để giữ nguyên bản demo đang dùng:
+
+```powershell
+git clone --branch v1.0-report --single-branch https://github.com/lduy1611/GoiYMonAn-TCP-Client-Server.git GoiYMonAn-v1.0-report
+cd GoiYMonAn-v1.0-report
+```
+
+Clone tag tạo trạng thái detached HEAD tại mốc báo cáo; dùng README đi kèm tag cho phiên bản đó.
 
 ## 8. Cấu trúc
 
