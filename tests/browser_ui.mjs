@@ -546,14 +546,29 @@ try {
   await noOverflow();
   // Use actual local B2 assets in both card modes and on the detail page.
   await navigate('/');
-  await wait('document.querySelectorAll("[data-select]").length > 0');
+  // Buttons can exist while restoreSelection() still has a queued scroll frame.
+  // Settle that frame before measuring coordinates for a real mouse click.
+  await wait('document.getElementById("ingredient-results").getAttribute("aria-busy") === "false" && document.querySelectorAll("[data-select]").length > 0');
+  await wait(`document.getElementById("selected-count").textContent === "2/30" && document.querySelector('[data-exclude="7"]')?.getAttribute("aria-pressed") === "true"`);
+  await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   await click('[data-exclude="7"]');
+  await wait(`document.getElementById("excluded-count").textContent === "0/30" && document.querySelector('[data-exclude="7"]').getAttribute("aria-pressed") === "false"`);
   await click('#mode-search');
+  await wait('document.getElementById("mode-search").getAttribute("aria-pressed") === "true" && !document.getElementById("recipe-query").disabled');
   await input('recipe-query', 'dau phu');
   await input('max-missing', '');
   await input('max-minutes', '');
+  const beforeTofuSearch = posts.length;
   await click('#recommend-button');
-  await wait('document.querySelector(".detail-link")?.getAttribute("href") === "/recipes/4"');
+  await wait('document.getElementById("results-area").getAttribute("aria-busy") === "false" && document.getElementById("result-count").textContent !== ""', 'Tofu search must finish before checking its results');
+  assert.equal(posts.length, beforeTofuSearch + 1, 'Tofu search must issue exactly one request');
+  assert.equal(new URL(posts.at(-1).url).pathname, '/api/search');
+  const tofuPayload = JSON.parse(posts.at(-1).postData);
+  assert.deepEqual(tofuPayload.excluded_ids, [], 'Remove garlic before expecting a tofu result');
+  assert.equal(tofuPayload.query, 'dau phu');
+  assert.equal(tofuPayload.max_minutes, null);
+  assert.equal(tofuPayload.max_missing, null);
+  assert.equal(await evaluate('document.querySelector(".detail-link")?.getAttribute("href")'), '/recipes/4');
   await checkImages(false);
   assert.equal(await evaluate('document.querySelector(".recipe-photo").dataset.placeholder'), 'false');
   await screenshot('photo-search-' + width);

@@ -4,7 +4,7 @@
 
 ## 1. Chạy demo
 
-- [README chính](../README.md): clone đúng nhánh `feature/v1.1-improvements`, Python/requirements, bốn SQL cho **database mới**, hai loại tài khoản MySQL, `.env`, TCP Server, FastAPI, CLI và kiểm thử.
+- [README chính](../README.md): clone mặc định nhánh `main` để chạy demo UI v1.2.3, Python/requirements, bốn SQL cho **database mới**, hai loại tài khoản MySQL, `.env`, TCP Server, FastAPI, CLI và kiểm thử.
 - [Thứ tự SQL và cách đếm dataset](../README.md#3-nạp-dữ-liệu-mysql-cho-lần-cài-mới): mục tiêu 50 nguyên liệu, 50 món, 252 quan hệ, `vi-v2-50-recipes-r1`. Không chạy lại trên database có dữ liệu cần giữ.
 - [Kiểm tra thủ công v1.2](V1_2_SEARCH.md#kiểm-tra-thủ-công): tìm có/không dấu, bộ lọc, phân trang và Back/reload.
 
@@ -27,4 +27,4 @@ Phiên bản **UI v1.2.3** là phiên bản giao diện/cache asset; giao thức
 - [Khảo sát ảnh B1](IMAGE_CANDIDATES.md), [bảng CSV B1](image_candidates.csv): ứng viên ban đầu, không phải mapping 50 ảnh hiện hành.
 - [Bằng chứng đã theo dõi](../statics/results/): giữ cả các lần E2 trước và lần lỗi. `phase4_dataset_audit.json` còn được tests ảnh và script E2 tham chiếu, không di chuyển cả thư mục khi dọn repository.
 
-Commit báo cáo `4a2afc1`, tag `v1.0-report` giữ nguyên. File `.log` lịch sử được nêu bằng tên vì không được Git phân phối; các tài liệu liên kết CSV/JSON có thật khi phù hợp, không tạo log giả hoặc thay đổi số liệu. Log TCP cũ vẫn được theo dõi trong Git ở giai đoạn này, chưa xóa/bỏ theo dõi. Không chạy script benchmark/audit/vẽ biểu đồ lên đường dẫn bằng chứng nếu chỉ muốn demo.
+Commit báo cáo `4a2afc1`, tag `v1.0-report` giữ nguyên bản đã nộp ban đầu; bản demo hiện tại nằm trên `main`. Xem [cách clone riêng tag báo cáo](../README.md#7-bằng-chứng-báo-cáo-và-giới-hạn) khi cần đối chiếu lịch sử. File `.log` lịch sử được nêu bằng tên vì không được Git phân phối; các tài liệu liên kết CSV/JSON có thật khi phù hợp, không tạo log giả hoặc thay đổi số liệu. Log TCP cũ vẫn được theo dõi trong Git ở giai đoạn này, chưa xóa/bỏ theo dõi. Không chạy script benchmark/audit/vẽ biểu đồ lên đường dẫn bằng chứng nếu chỉ muốn demo.
