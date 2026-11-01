@@ -53,13 +53,20 @@ def test_both_pages_use_matching_versioned_assets_and_focusable_skip_targets():
         parsed = page(name)
         assets = [attrs.get("href") if tag == "link" else attrs.get("src")
                   for tag, attrs in parsed.elements if tag in {"link", "script"}]
-        assert len(assets) == 2
+        assert len(assets) == 3
         for asset in assets:
             version = parse_qs(urlsplit(asset).query).get("v")
             assert version and version[0], "CSS/JS need release URLs to avoid mixed cached versions"
             versions.add(version[0])
         assert any(attrs.get("id") == target and attrs.get("tabindex") == "-1" for _, attrs in parsed.elements)
     assert len(versions) == 1
+
+
+def test_shared_image_loader_precedes_page_script():
+    for name, consumer in (("index.html", "/static/app.js"), ("detail.html", "/static/detail.js")):
+        parsed = page(name)
+        scripts = [urlsplit(attrs["src"]).path for tag, attrs in parsed.elements if tag == "script" and "src" in attrs]
+        assert scripts.index("/static/recipe-images.js") < scripts.index(consumer)
 
 
 def test_advanced_filter_disclosure_has_a_single_labeled_target():

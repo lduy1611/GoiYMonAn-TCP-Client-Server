@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" role="img" aria-labelledby="title desc">
+  <title id="title">Chưa có ảnh món ăn</title>
+  <desc id="desc">Biểu tượng bát và đĩa trung tính, không đại diện cho một món cụ thể.</desc>
+  <rect width="960" height="600" fill="#edf2e8"/>
+  <circle cx="480" cy="288" r="148" fill="#e0e9d7"/>
+  <ellipse cx="480" cy="369" rx="150" ry="18" fill="#cbd9c0"/>
+  <path d="M358 268h244c-7 67-49 105-122 105s-115-38-122-105Z" fill="#fafcf6" stroke="#6c8865" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M408 224c-18-27 18-38 0-65m72 65c-18-27 18-38 0-65m72 65c-18-27 18-38 0-65" fill="none" stroke="#8ba17f" stroke-width="9" stroke-linecap="round"/>
+  <path d="M415 388h130" stroke="#6c8865" stroke-width="7" stroke-linecap="round"/>
+</svg>

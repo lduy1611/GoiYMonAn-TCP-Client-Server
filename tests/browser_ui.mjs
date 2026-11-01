@@ -19,9 +19,15 @@ let serial = 0;
 let session;
 const pending = new Map();
 const pageErrors = [];
+const imageMetrics = [];
 const posts = [];
 const apiRequests = [];
 let legacyCss;
+let imageCatalogOverride = null;
+let imageCatalogFails = false;
+let serveImageFixture = false;
+// Authored neutral SVG for exercising successful image loading, not a downloaded dish image.
+const imageFixture = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600"><rect width="960" height="600" fill="#e5eddc"/><circle cx="480" cy="300" r="120" fill="#61754f"/></svg>').toString('base64');
 const send = (method, params = {}, sessionId = session) => new Promise((resolve, reject) => {
   const id = ++serial;
   const timer = setTimeout(() => { pending.delete(id); reject(Error('CDP timeout: ' + method)); }, 15000);
@@ -44,10 +50,15 @@ try {
     const message = JSON.parse(event.data);
     if (message.method === 'Fetch.requestPaused') {
       const {requestId, request} = message.params;
-      const method = legacyCss && new URL(request.url).pathname === '/static/styles.css' && !new URL(request.url).search
+      const url = new URL(request.url);
+      const overrideImages = url.pathname === '/static/recipe-images.json' && (imageCatalogOverride !== null || imageCatalogFails);
+      const fixtureImage = serveImageFixture && url.pathname === '/static/images/recipes/test-approved-image.svg';
+      const method = fixtureImage || overrideImages || legacyCss && url.pathname === '/static/styles.css' && !url.search
         ? 'Fetch.fulfillRequest' : 'Fetch.continueRequest';
       const params = method === 'Fetch.fulfillRequest'
-        ? {requestId, responseCode: 200, responseHeaders: [{name: 'Content-Type', value: 'text/css'}], body: legacyCss}
+        ? {requestId, responseCode: overrideImages && imageCatalogFails ? 503 : 200,
+           responseHeaders: [{name: 'Content-Type', value: fixtureImage ? 'image/svg+xml' : overrideImages ? 'application/json' : 'text/css'}],
+           body: fixtureImage ? imageFixture : overrideImages ? Buffer.from(JSON.stringify(imageCatalogOverride || {})).toString('base64') : legacyCss}
         : {requestId};
       send(method, params, message.sessionId).catch(error => pageErrors.push(error.message));
     }
@@ -125,6 +136,49 @@ try {
   };
   const noOverflow = async () => {
     assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), 'Horizontal overflow at ' + width);
+  };
+  const checkImages = async detail => {
+    const catalog = await evaluate('window.RecipeImages.ready()');
+    const selector = detail ? '#detail .recipe-photo' : '.recipe-card .recipe-photo';
+    await wait('document.querySelectorAll(' + JSON.stringify(selector) + ').length > 0');
+    const photos = await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)}), image => ({
+      id: Number(image.dataset.recipeId), path: image.getAttribute('src'), alt: image.alt, loading: image.loading,
+      placeholder: image.dataset.placeholder, width: image.width, height: image.height,
+      link: image.closest('figure').querySelector('a')?.getAttribute('href') || null,
+      credit: image.closest('figure').querySelector('figcaption').textContent,
+      srcset: image.getAttribute('srcset'), sizes: image.sizes,
+      fit: getComputedStyle(image).objectFit, renderedWidth: image.getBoundingClientRect().width,
+      viewport: innerWidth
+    }))`);
+    if (!detail) assert.equal(photos.length, await evaluate('document.querySelectorAll(".recipe-card").length'));
+    for (const photo of photos) {
+      const entry = catalog.recipes[String(photo.id)];
+      const real = entry?.is_placeholder === false;
+      assert.equal(photo.path, real ? entry.image_path : '/static/images/recipes/placeholder.svg');
+      assert.equal(photo.placeholder, real ? 'false' : 'true');
+      assert.ok(photo.alt.trim().length > 0);
+      assert.ok(photo.path.startsWith('/static/images/recipes/'), 'Never hotlink images');
+      assert.equal(photo.loading, detail ? 'eager' : 'lazy');
+      assert.ok(photo.width > 0 && photo.height > 0);
+      if (real) {
+        assert.equal(photo.srcset, Object.entries(entry.variants || {}).map(([w,p]) => p + ' ' + w + 'w').join(', ') || null);
+        if (entry.variants) assert.ok(photo.sizes.length > 0);
+        if (entry.source_type === 'project_ai') {
+          assert.equal(photo.link, null, 'Project AI credit has no invented source URL');
+          assert.equal(photo.credit, entry.source_name);
+          assert.equal(photo.fit, 'contain', 'Do not crop project originals');
+        } else assert.ok(photo.link && new URL(photo.link).href === new URL(entry.source_url).href);
+      }
+      assert.ok(photo.renderedWidth <= photo.viewport, 'Image fits viewport');
+    }
+    await evaluate('document.querySelector(' + JSON.stringify(selector) + ').scrollIntoView({block:"center"})');
+    await wait('(() => {const image=document.querySelector(' + JSON.stringify(selector) + ');return image.complete && image.naturalWidth > 0})()');
+    const current = await evaluate('document.querySelector(' + JSON.stringify(selector) + ').currentSrc');
+    const firstEntry = catalog.recipes[String(photos[0].id)];
+    assert.equal(new URL(current).origin, new URL(baseUrl).origin);
+    if (firstEntry?.variants) assert.ok(Object.values(firstEntry.variants).includes(new URL(current).pathname));
+    imageMetrics.push(...photos.map(photo => ({...photo, current: photo.id === photos[0].id ? current : null})));
+    return catalog;
   };
   const screenshot = async label => {
     // Capture at the top so sticky headers are positioned correctly in a full-page image.
@@ -237,6 +291,7 @@ try {
   assert.ok(await evaluate('document.querySelectorAll(".recipe-card").length <= 3'));
   const expected = await evaluate('fetch("/api/recommend", {method:"POST",headers:{"Content-Type":"application/json"},body:' + JSON.stringify(JSON.stringify(payload)) + '}).then(r=>r.json()).then(r=>r.data.items)');
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'), expected.map(item => item.title));
+  await checkImages(false);
   await noOverflow();
   await screenshot('results-' + width);
   if (width < 760) { await resize(320); await noOverflow(); await screenshot('results-320'); await resize(width); }
@@ -250,8 +305,10 @@ try {
   await click('.ingredient-list input');
   assert.equal(await evaluate('document.querySelector(".ingredient-list input").checked'), true);
   assert.equal(await evaluate('document.querySelector(".instruction-single p").textContent'), recipe.instructions);
+  await checkImages(true);
   await noOverflow();
   await screenshot('recipe-' + width);
+  if (width < 760) { await resize(320); await checkImages(true); await noOverflow(); await screenshot('recipe-320'); await resize(width); }
   await back();
   await wait('document.getElementById("selected-count").textContent === "2/30"');
   await screenshot('back-restored-' + width);
@@ -423,6 +480,7 @@ try {
   await click('#page-next');
   await wait('document.getElementById("page-label").textContent === "Trang 2 / 2"');
   assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/3');
+  await checkImages(false);
   await screenshot('search-' + width);
   if (width < 760) { await resize(320); await noOverflow(); await screenshot('search-320'); await resize(width); }
   await click('.detail-link');
@@ -486,6 +544,115 @@ try {
   await click('#retry-recipe');
   await wait('document.getElementById("detail").getAttribute("aria-busy") === "false"');
   await noOverflow();
+  // Use actual local B2 assets in both card modes and on the detail page.
+  await navigate('/');
+  await wait('document.querySelectorAll("[data-select]").length > 0');
+  await click('[data-exclude="7"]');
+  await click('#mode-search');
+  await input('recipe-query', 'dau phu');
+  await input('max-missing', '');
+  await input('max-minutes', '');
+  await click('#recommend-button');
+  await wait('document.querySelector(".detail-link")?.getAttribute("href") === "/recipes/4"');
+  await checkImages(false);
+  assert.equal(await evaluate('document.querySelector(".recipe-photo").dataset.placeholder'), 'false');
+  await screenshot('photo-search-' + width);
+  await click('.detail-link');
+  await wait('document.querySelector(".detail-heading h1") !== null');
+  await checkImages(true);
+  await screenshot('photo-recipe-' + width);
+  if (width < 760) { await resize(320); await noOverflow(); await screenshot('photo-recipe-320'); await resize(width); }
+  await back();
+  await checkImages(false);
+  await reloadHome();
+  await checkImages(false);
+  await click('#mode-recommend');
+  await input('max-minutes', '20');
+  await input('top-k', '5');
+  await click('[data-select="5"]');
+  await click('#recommend-button');
+  await wait('document.querySelector(\'[data-recipe-media][data-recipe-id="4"]\') !== null');
+  await checkImages(false);
+  await noOverflow();
+  await screenshot('photo-results-' + width);
+  if (width < 760) { await resize(320); await checkImages(false); await noOverflow(); await screenshot('photo-results-320'); await resize(width); }
+  // Exercise an approved-image entry with a local test fixture; no claim of actual source approval.
+  serveImageFixture = true;
+  imageCatalogOverride = {recipes: {'1': {recipe_id: 1, is_placeholder: false,
+    image_path: '/static/images/recipes/test-approved-image.svg', alt: 'Neutral AI illustration test fixture',
+    source_url: 'https://example.invalid/test-source', source_name: 'Test fixture', generated_ai: true,
+    variants: {'960': '/static/images/recipes/test-approved-image.svg'}}}};
+  await send('Fetch.enable', {patterns: [{urlPattern: '*recipe-images.json*'}, {urlPattern: '*test-approved-image.svg'}]});
+  await reloadWithSnapshot(validSnapshot);
+  await checkImages(false);
+  assert.ok(await evaluate('document.querySelector(\'[data-recipe-media][data-recipe-id="1"] figcaption\').textContent.includes("Minh họa AI")'));
+  await click('[data-recipe-media][data-recipe-id="1"] + .recipe-top ~ .detail-link');
+  await wait('document.querySelector(".detail-heading h1") !== null');
+  await checkImages(true);
+  await back();
+  await checkImages(false);
+  await reloadHome();
+  await checkImages(false);
+  await reloadWithSnapshot(searchSnapshot);
+  await click('#page-prev');
+  await wait('document.getElementById("page-label").textContent === "Trang 1 / 2"');
+  await checkImages(false);
+  await send('Fetch.disable');
+  imageCatalogOverride = null;
+  serveImageFixture = false;
+  // Missing metadata and missing/cross-origin photos must fall back without changing recipe data.
+  for (const override of [
+    {recipes: {}},
+    {recipes: null},
+    {recipes: {'1': {recipe_id: 2, is_placeholder: false, image_path: '/static/images/recipes/placeholder.svg'}}},
+    {recipes: {'1': {recipe_id: 1, is_placeholder: false, image_path: '/static/images/recipes/test-missing-image.webp',
+      source_url: 'https://example.invalid/test-source', source_name: 'Test fixture', alt: 'Test missing photo'}}},
+    {recipes: {'1': {recipe_id: 1, is_placeholder: false, image_path: '/static/images/recipes/test-missing-image.webp',
+      source_type: 'project_ai', generated_ai: true, source_url: null, source_name: 'Project AI fixture'}}},
+    {recipes: {'1': {recipe_id: 1, is_placeholder: false, image_path: '/static/images/recipes/test-approved-image.svg',
+      source_type: 'unknown', generated_ai: true, source_url: null, source_name: 'Untrusted missing source'}}},
+    {recipes: {'1': {recipe_id: 1, is_placeholder: false, image_path: 'https://example.invalid/never-hotlink.webp',
+      source_url: 'https://example.invalid/test-source', source_name: 'Test fixture'}}}
+  ]) {
+    imageCatalogOverride = override;
+    await send('Fetch.enable', {patterns: [{urlPattern: '*recipe-images.json*'}]});
+    await navigate('/recipes/1');
+    await wait('document.querySelector(".detail-heading h1") !== null');
+    await evaluate('window.RecipeImages.ready()');
+    await wait('document.querySelector(".detail-media img")?.dataset.placeholder === "true" && document.querySelector(".detail-media img").complete && document.querySelector(".detail-media img").naturalWidth > 0');
+    assert.equal(await evaluate('document.querySelector(".detail-media img").getAttribute("src")'), '/static/images/recipes/placeholder.svg');
+    assert.equal(await evaluate('document.querySelector(".detail-media img").getAttribute("srcset")'), null);
+    await send('Fetch.disable');
+    imageCatalogOverride = null;
+  }
+  imageCatalogFails = true;
+  await send('Fetch.enable', {patterns: [{urlPattern: '*recipe-images.json*'}]});
+  await navigate('/recipes/1');
+  await wait('document.querySelector(".detail-heading h1") !== null');
+  await checkImages(true);
+  await send('Fetch.disable');
+  imageCatalogFails = false;
+  // Component-level coverage for every real catalog ID, independent of the 10-recipe SQLite fixture.
+  // This only mounts image metadata; it does not invent recipes or call a modified API.
+  await navigate('/recipes/1');
+  await wait('document.querySelector(".detail-heading h1") !== null');
+  await evaluate(`(async () => {
+    const catalog = await window.RecipeImages.ready();
+    const root = document.createElement('section'); root.id = 'catalog-image-check';
+    for (const entry of Object.values(catalog.recipes)) {
+      const figure = document.createElement('figure'); figure.dataset.recipeMedia = '';
+      figure.dataset.recipeId = String(entry.recipe_id); figure.dataset.recipeTitle = entry.alt;
+      root.append(figure);
+    }
+    document.body.append(root); window.RecipeImages.mount(root);
+    await Promise.resolve();
+    root.querySelectorAll('img').forEach(image => {image.loading = 'eager'; image.sizes = '320px';});
+  })()`);
+  await wait('document.querySelectorAll("#catalog-image-check img").length === 50 && [...document.querySelectorAll("#catalog-image-check img")].every(image => image.complete && image.naturalWidth > 0 && image.dataset.placeholder === "false")');
+  assert.equal(await evaluate('document.querySelectorAll(\'#catalog-image-check [data-source-type="project_ai"]\').length'), 15);
+  assert.ok(await evaluate('[...document.querySelectorAll("#catalog-image-check img")].every(image => new URL(image.currentSrc).pathname.includes("recipe-" + image.dataset.recipeId.padStart(2,"0") + "-"))'));
+  await evaluate('document.getElementById("catalog-image-check").remove()');
+  await writeFile(join(profileDir, 'image-metrics-' + width + '.json'), JSON.stringify(imageMetrics, null, 2));
   assert.deepEqual(pageErrors, [], 'Uncaught browser JavaScript errors');
   console.log('PASS: viewport ' + width + '; search, selection, exclusions, filters, ranking, detail, persistence, empty/error/retry, no horizontal overflow.');
   }

@@ -1,0 +1,1121 @@
+{
+  "version": "images-1.2.3",
+  "placeholder_path": "/static/images/recipes/placeholder.svg",
+  "recipes": {
+    "1": {
+      "recipe_id": 1,
+      "image_path": "/static/images/recipes/recipe-01-ai-640.webp",
+      "alt": "Trứng sốt cà chua (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-01-ai-320.webp",
+        "640": "/static/images/recipes/recipe-01-ai-640.webp",
+        "960": "/static/images/recipes/recipe-01-ai-960.webp"
+      },
+      "source_original_filename": "recipe-01.png",
+      "source_sha256": "0d40587c6aa687ea494e25154040d2e4ad2cfa77baeb97c374b9ceb1989f843d",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "2": {
+      "recipe_id": 2,
+      "image_path": "/static/images/recipes/recipe-02-ai-640.webp",
+      "alt": "Món thịt rau củ (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-02-ai-320.webp",
+        "640": "/static/images/recipes/recipe-02-ai-640.webp",
+        "960": "/static/images/recipes/recipe-02-ai-960.webp"
+      },
+      "source_original_filename": "recipe-02.png",
+      "source_sha256": "d54bf5b4bd27d8918c34ebb8ff297a7111a2857d02400303e45931ca90536db0",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "3": {
+      "recipe_id": 3,
+      "image_path": "/static/images/recipes/recipe-03-ai-640.webp",
+      "alt": "Trứng xào hành (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-03-ai-320.webp",
+        "640": "/static/images/recipes/recipe-03-ai-640.webp",
+        "960": "/static/images/recipes/recipe-03-ai-960.webp"
+      },
+      "source_original_filename": "recipe-03.png",
+      "source_sha256": "da801dcd39c2b30a9479e54172b68de9e72588a4d544901840c18e8fb3ae2348",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "4": {
+      "recipe_id": 4,
+      "image_path": "/static/images/recipes/recipe-04-640.webp",
+      "alt": "Đậu phụ sốt cà chua (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/dau-phu-sot-ca-chua",
+      "source_image_url": "https://img.agni.vn/agni-mon/dau-phu-sot-ca-chua-e031a31c1214-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-04-320.webp",
+        "640": "/static/images/recipes/recipe-04-640.webp",
+        "960": "/static/images/recipes/recipe-04-960.webp"
+      },
+      "source_sha256": "e031a31c12141699a9f803fa0470acf175fe5823348034a5226099ad6a557046",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "5": {
+      "recipe_id": 5,
+      "image_path": "/static/images/recipes/recipe-05-640.webp",
+      "alt": "Rau muống xào tỏi (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/rau-muong-xao-toi",
+      "source_image_url": "https://img.agni.vn/agni-mon/rau-muong-xao-toi-565d0fee9c3d-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-05-320.webp",
+        "640": "/static/images/recipes/recipe-05-640.webp",
+        "960": "/static/images/recipes/recipe-05-960.webp"
+      },
+      "source_sha256": "565d0fee9c3d9be678341e9f9bc9e7f30e8d82985908ed80b0764530ad6600ef",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "6": {
+      "recipe_id": 6,
+      "image_path": "/static/images/recipes/recipe-06-640.webp",
+      "alt": "Canh gà nấm hương (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/canh-ga-nam-huong",
+      "source_image_url": "https://img.agni.vn/agni-mon/canh-ga-nam-huong-5d6730efc70b-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-06-320.webp",
+        "640": "/static/images/recipes/recipe-06-640.webp",
+        "960": "/static/images/recipes/recipe-06-960.webp"
+      },
+      "source_sha256": "5d6730efc70b44fcda4e6735b2b0e1cb145ce8288e5eef4f20d1e0560e704c69",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "7": {
+      "recipe_id": 7,
+      "image_path": "/static/images/recipes/recipe-07-ai-640.webp",
+      "alt": "Cá basa kho gừng (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-07-ai-320.webp",
+        "640": "/static/images/recipes/recipe-07-ai-640.webp",
+        "960": "/static/images/recipes/recipe-07-ai-960.webp"
+      },
+      "source_original_filename": "recipe-07.png",
+      "source_sha256": "e89631eba3001658bd3270d780c962590d75c0a9a02534834444cbee389dfb0d",
+      "source_dimensions": [
+        1585,
+        992
+      ]
+    },
+    "8": {
+      "recipe_id": 8,
+      "image_path": "/static/images/recipes/recipe-08-ai-640.webp",
+      "alt": "Bún thịt xào (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-08-ai-320.webp",
+        "640": "/static/images/recipes/recipe-08-ai-640.webp",
+        "960": "/static/images/recipes/recipe-08-ai-960.webp"
+      },
+      "source_original_filename": "recipe-08.png",
+      "source_sha256": "e13f0ff07beeb5f3020f173103ddef43ea51e58bb0bc94890c53125893017259",
+      "source_dimensions": [
+        1585,
+        992
+      ]
+    },
+    "9": {
+      "recipe_id": 9,
+      "image_path": "/static/images/recipes/recipe-09-ai-640.webp",
+      "alt": "Khoai tây xào cà rốt (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-09-ai-320.webp",
+        "640": "/static/images/recipes/recipe-09-ai-640.webp",
+        "960": "/static/images/recipes/recipe-09-ai-960.webp"
+      },
+      "source_original_filename": "recipe-09.png",
+      "source_sha256": "59c7e84d31dd5b210d45726c9c9e71814653f0929def192a4243589844fd73bd",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "10": {
+      "recipe_id": 10,
+      "image_path": "/static/images/recipes/recipe-10-ai-640.webp",
+      "alt": "Trứng cuộn rau củ (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-10-ai-320.webp",
+        "640": "/static/images/recipes/recipe-10-ai-640.webp",
+        "960": "/static/images/recipes/recipe-10-ai-960.webp"
+      },
+      "source_original_filename": "recipe-10.png",
+      "source_sha256": "b9fe776b793220602394c3052e85ebe2359ce0d27fc308cd56ebbcec9c2f140c",
+      "source_dimensions": [
+        1585,
+        992
+      ]
+    },
+    "11": {
+      "recipe_id": 11,
+      "image_path": "/static/images/recipes/recipe-11-640.webp",
+      "alt": "Phở bò (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/pho-bo",
+      "source_image_url": "https://img.agni.vn/agni-mon/pho-bo-30ba26e7f588-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-11-320.webp",
+        "640": "/static/images/recipes/recipe-11-640.webp",
+        "960": "/static/images/recipes/recipe-11-960.webp"
+      },
+      "source_sha256": "30ba26e7f58875ffdee8da770239eca33c6fb32a0f426ebb678527c2fdf4c4cc",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "12": {
+      "recipe_id": 12,
+      "image_path": "/static/images/recipes/recipe-12-640.webp",
+      "alt": "Phở gà (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/pho-ga",
+      "source_image_url": "https://img.agni.vn/agni-mon/pho-ga-bff59dc2e3dc-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-12-320.webp",
+        "640": "/static/images/recipes/recipe-12-640.webp",
+        "960": "/static/images/recipes/recipe-12-960.webp"
+      },
+      "source_sha256": "bff59dc2e3dc42e89271be42c6d8bba610e12d68e911ca7bdfb7213f0e989e15",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "13": {
+      "recipe_id": 13,
+      "image_path": "/static/images/recipes/recipe-13-640.webp",
+      "alt": "Bún chả (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/bun-cha",
+      "source_image_url": "https://img.agni.vn/agni-mon/bun-cha-8e475d1153e3-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-13-320.webp",
+        "640": "/static/images/recipes/recipe-13-640.webp",
+        "960": "/static/images/recipes/recipe-13-960.webp"
+      },
+      "source_sha256": "8e475d1153e308e710152738d8f6d8a55512f59ec83dc995833e09656d79ebac",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "14": {
+      "recipe_id": 14,
+      "image_path": "/static/images/recipes/recipe-14-640.webp",
+      "alt": "Bún bò Huế (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/bun-bo-hue",
+      "source_image_url": "https://img.agni.vn/agni-mon/bun-bo-hue-c8aa5696e2e2-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-14-320.webp",
+        "640": "/static/images/recipes/recipe-14-640.webp",
+        "960": "/static/images/recipes/recipe-14-960.webp"
+      },
+      "source_sha256": "c8aa5696e2e295f7f4aa053c0819385f0480a43d13bb9275433292cae9a91c23",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "15": {
+      "recipe_id": 15,
+      "image_path": "/static/images/recipes/recipe-15-640.webp",
+      "alt": "Bún riêu cua (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/bun-rieu-cua",
+      "source_image_url": "https://img.agni.vn/agni-mon/bun-rieu-cua-3c6ed06257a6-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-15-320.webp",
+        "640": "/static/images/recipes/recipe-15-640.webp",
+        "960": "/static/images/recipes/recipe-15-960.webp"
+      },
+      "source_sha256": "3c6ed06257a6181ec17b7e922e1a564d6f2d0bcc620b4bdd1534ceb86a4f0ac2",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "16": {
+      "recipe_id": 16,
+      "image_path": "/static/images/recipes/recipe-16-640.webp",
+      "alt": "Gỏi cuốn tôm thịt (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/goi-cuon",
+      "source_image_url": "https://img.agni.vn/agni-mon/goi-cuon-98a124204231-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-16-320.webp",
+        "640": "/static/images/recipes/recipe-16-640.webp",
+        "960": "/static/images/recipes/recipe-16-960.webp"
+      },
+      "source_sha256": "98a124204231f9b7a08336f7bc4098b7f8311ed2b5e7d1af1bfa1fc40c8f215c",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "17": {
+      "recipe_id": 17,
+      "image_path": "/static/images/recipes/recipe-17-640.webp",
+      "alt": "Chả giò (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/nem-ran",
+      "source_image_url": "https://img.agni.vn/agni-mon/nem-ran-f01101878347-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-17-320.webp",
+        "640": "/static/images/recipes/recipe-17-640.webp",
+        "960": "/static/images/recipes/recipe-17-960.webp"
+      },
+      "source_sha256": "f01101878347b4f81d2e9a366a8310db075a53883d153bd3a555523eef7f562a",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "18": {
+      "recipe_id": 18,
+      "image_path": "/static/images/recipes/recipe-18-640.webp",
+      "alt": "Bánh xèo (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/banh-xeo",
+      "source_image_url": "https://img.agni.vn/agni-mon/banh-xeo-36abbd7fa406-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-18-320.webp",
+        "640": "/static/images/recipes/recipe-18-640.webp",
+        "960": "/static/images/recipes/recipe-18-960.webp"
+      },
+      "source_sha256": "36abbd7fa406e186a54f2981a1496f7317c8c8d83450d670dd6a53af3849c4a6",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "19": {
+      "recipe_id": 19,
+      "image_path": "/static/images/recipes/recipe-19-640.webp",
+      "alt": "Bánh cuốn nhân thịt (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/banh-cuon",
+      "source_image_url": "https://img.agni.vn/agni-mon/banh-cuon-3a18b6df718b-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-19-320.webp",
+        "640": "/static/images/recipes/recipe-19-640.webp",
+        "960": "/static/images/recipes/recipe-19-960.webp"
+      },
+      "source_sha256": "3a18b6df718bc0bed19610a6dfa69fc6e9a771de2a16820c21ce25fe64b641ba",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "20": {
+      "recipe_id": 20,
+      "image_path": "/static/images/recipes/recipe-20-ai-640.webp",
+      "alt": "Cao lầu Hội An (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-20-ai-320.webp",
+        "640": "/static/images/recipes/recipe-20-ai-640.webp",
+        "960": "/static/images/recipes/recipe-20-ai-960.webp"
+      },
+      "source_original_filename": "recipe-20.png",
+      "source_sha256": "7167eff55cd40ccbf3f8ee1ae145d2f752842497495d5b0aa466be0b95490c09",
+      "source_dimensions": [
+        1585,
+        992
+      ]
+    },
+    "21": {
+      "recipe_id": 21,
+      "image_path": "/static/images/recipes/recipe-21-ai-640.webp",
+      "alt": "Mì Quảng tôm thịt (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-21-ai-320.webp",
+        "640": "/static/images/recipes/recipe-21-ai-640.webp",
+        "960": "/static/images/recipes/recipe-21-ai-960.webp"
+      },
+      "source_original_filename": "recipe-21.png",
+      "source_sha256": "7c01fe146643301c57fde9dfa74052a83264af52601e5e4508ab2e4cabb05f26",
+      "source_dimensions": [
+        1585,
+        992
+      ]
+    },
+    "22": {
+      "recipe_id": 22,
+      "image_path": "/static/images/recipes/recipe-22-640.webp",
+      "alt": "Cơm tấm sườn (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/com-tam-suon-nuong",
+      "source_image_url": "https://img.agni.vn/agni-mon/com-tam-suon-nuong-b98ee1745f57-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-22-320.webp",
+        "640": "/static/images/recipes/recipe-22-640.webp",
+        "960": "/static/images/recipes/recipe-22-960.webp"
+      },
+      "source_sha256": "b98ee1745f577cb337d06d62eed1c6817f4acf0a7edaa1cf369718b2b96a2088",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "23": {
+      "recipe_id": 23,
+      "image_path": "/static/images/recipes/recipe-23-640.webp",
+      "alt": "Cơm gà xối mỡ (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/com-ga-xoi-mo",
+      "source_image_url": "https://img.agni.vn/agni-mon/com-ga-xoi-mo-5ae68b336bf7-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-23-320.webp",
+        "640": "/static/images/recipes/recipe-23-640.webp",
+        "960": "/static/images/recipes/recipe-23-960.webp"
+      },
+      "source_sha256": "5ae68b336bf759b07e67b9c10a3a1cb5abfd91b8e6aae8f27285d70ea4ac673d",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "24": {
+      "recipe_id": 24,
+      "image_path": "/static/images/recipes/recipe-24-640.webp",
+      "alt": "Cơm chiên Dương Châu (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/com-rang-duong-chau",
+      "source_image_url": "https://img.agni.vn/agni-mon/com-rang-duong-chau-4db31951300a-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-24-320.webp",
+        "640": "/static/images/recipes/recipe-24-640.webp",
+        "960": "/static/images/recipes/recipe-24-960.webp"
+      },
+      "source_sha256": "4db31951300a529180eebe4252f2b3f994767f98bd3ae8aaebd0a97d7de59caa",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "25": {
+      "recipe_id": 25,
+      "image_path": "/static/images/recipes/recipe-25-640.webp",
+      "alt": "Cơm chiên cá mặn (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/com-rang-ca-man",
+      "source_image_url": "https://img.agni.vn/agni-mon/com-rang-ca-man-36e0c7b90d3d-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-25-320.webp",
+        "640": "/static/images/recipes/recipe-25-640.webp",
+        "960": "/static/images/recipes/recipe-25-960.webp"
+      },
+      "source_sha256": "36e0c7b90d3d217b8ed1636c65d0ddd16e9ce6b122a05ee95b7df42b6a03d709",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "26": {
+      "recipe_id": 26,
+      "image_path": "/static/images/recipes/recipe-26-640.webp",
+      "alt": "Cá kho tộ (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/ca-kho-to",
+      "source_image_url": "https://img.agni.vn/agni-mon/ca-kho-to-8f56b69b52be-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-26-320.webp",
+        "640": "/static/images/recipes/recipe-26-640.webp",
+        "960": "/static/images/recipes/recipe-26-960.webp"
+      },
+      "source_sha256": "8f56b69b52bebe310233c5de959d1899b0ac73eba2532ca6a647c1ed9edfbdb4",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "27": {
+      "recipe_id": 27,
+      "image_path": "/static/images/recipes/recipe-27-640.webp",
+      "alt": "Thịt kho trứng (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/thit-kho-trung",
+      "source_image_url": "https://img.agni.vn/agni-mon/thit-kho-trung-7176e82aba19-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-27-320.webp",
+        "640": "/static/images/recipes/recipe-27-640.webp",
+        "960": "/static/images/recipes/recipe-27-960.webp"
+      },
+      "source_sha256": "7176e82aba190acdc6eeccd83c313b1e0ed072abb72554cd7c1e74a7ee6e831e",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "28": {
+      "recipe_id": 28,
+      "image_path": "/static/images/recipes/recipe-28-640.webp",
+      "alt": "Canh chua cá (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/canh-chua-ca",
+      "source_image_url": "https://img.agni.vn/agni-mon/canh-chua-ca-fd74f874da6b-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-28-320.webp",
+        "640": "/static/images/recipes/recipe-28-640.webp",
+        "960": "/static/images/recipes/recipe-28-960.webp"
+      },
+      "source_sha256": "fd74f874da6b66b42762e93c229b835977a52aba2ac6e10aa46254397eefde2b",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "29": {
+      "recipe_id": 29,
+      "image_path": "/static/images/recipes/recipe-29-640.webp",
+      "alt": "Canh bí đỏ hầm xương (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/canh-bi-do-nau-suon",
+      "source_image_url": "https://img.agni.vn/agni-mon/canh-bi-do-nau-suon-63842ef2b111-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-29-320.webp",
+        "640": "/static/images/recipes/recipe-29-640.webp",
+        "960": "/static/images/recipes/recipe-29-960.webp"
+      },
+      "source_sha256": "63842ef2b1117a12c3224e26e3e62be802a903e683c9fd1f8c5193c66568f232",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "30": {
+      "recipe_id": 30,
+      "image_path": "/static/images/recipes/recipe-30-640.webp",
+      "alt": "Canh rau ngót thịt bằm (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/canh-rau-ngot-nau-thit-bam",
+      "source_image_url": "https://img.agni.vn/agni-mon/canh-rau-ngot-nau-thit-bam-c039ff029838-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-30-320.webp",
+        "640": "/static/images/recipes/recipe-30-640.webp",
+        "960": "/static/images/recipes/recipe-30-960.webp"
+      },
+      "source_sha256": "c039ff029838dba9bd3df32a87c575faeee7ef52e91a609264699ed5a5f124a7",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "31": {
+      "recipe_id": 31,
+      "image_path": "/static/images/recipes/recipe-31-640.webp",
+      "alt": "Canh cải chua sườn (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/canh-suon-nau-dua-chua",
+      "source_image_url": "https://img.agni.vn/agni-mon/canh-suon-nau-dua-chua-8ea463d4b402-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-31-320.webp",
+        "640": "/static/images/recipes/recipe-31-640.webp",
+        "960": "/static/images/recipes/recipe-31-960.webp"
+      },
+      "source_sha256": "8ea463d4b4026758d58242ea53e007677571ae3d38bf311ed9bd024eefad5257",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "32": {
+      "recipe_id": 32,
+      "image_path": "/static/images/recipes/recipe-32-ai-640.webp",
+      "alt": "Canh nấm rơm đậu phụ (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-32-ai-320.webp",
+        "640": "/static/images/recipes/recipe-32-ai-640.webp",
+        "960": "/static/images/recipes/recipe-32-ai-960.webp"
+      },
+      "source_original_filename": "recipe-32.png",
+      "source_sha256": "c9afe2b57223d8da157b887a511cd2a5971a6fd64fed25b2d5e8bfaab94f3c5f",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "33": {
+      "recipe_id": 33,
+      "image_path": "/static/images/recipes/recipe-33-640.webp",
+      "alt": "Gà kho gừng (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/ga-kho-gung",
+      "source_image_url": "https://img.agni.vn/agni-mon/ga-kho-gung-d0295981c2d9-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-33-320.webp",
+        "640": "/static/images/recipes/recipe-33-640.webp",
+        "960": "/static/images/recipes/recipe-33-960.webp"
+      },
+      "source_sha256": "d0295981c2d9f3106a939714f20e9888ad160e7ed5ce9c198276707beafa6075",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "34": {
+      "recipe_id": 34,
+      "image_path": "/static/images/recipes/recipe-34-640.webp",
+      "alt": "Gà xào sả ớt (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/ga-xao-sa-ot",
+      "source_image_url": "https://img.agni.vn/agni-mon/ga-xao-sa-ot-2edbe553384f-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-34-320.webp",
+        "640": "/static/images/recipes/recipe-34-640.webp",
+        "960": "/static/images/recipes/recipe-34-960.webp"
+      },
+      "source_sha256": "2edbe553384f2d223ea75eaca5908af03742267ebd4b52a37fb6624276f2160e",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "35": {
+      "recipe_id": 35,
+      "image_path": "/static/images/recipes/recipe-35-640.webp",
+      "alt": "Bò lúc lắc (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/bo-luc-lac",
+      "source_image_url": "https://img.agni.vn/agni-mon/bo-luc-lac-06df7a7ba6e4-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-35-320.webp",
+        "640": "/static/images/recipes/recipe-35-640.webp",
+        "960": "/static/images/recipes/recipe-35-960.webp"
+      },
+      "source_sha256": "06df7a7ba6e4ff07aa5516391a65a3b99c1bafa7afd468a879dddc2995398331",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "36": {
+      "recipe_id": 36,
+      "image_path": "/static/images/recipes/recipe-36-640.webp",
+      "alt": "Bò xào rau muống (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/rau-muong-xao-thit-bo",
+      "source_image_url": "https://img.agni.vn/agni-mon/rau-muong-xao-thit-bo-7b276092ff2d-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-36-320.webp",
+        "640": "/static/images/recipes/recipe-36-640.webp",
+        "960": "/static/images/recipes/recipe-36-960.webp"
+      },
+      "source_sha256": "7b276092ff2d4cfc233384b363e72ee7e7f5439c3c470261d3cbd2f4f18e101e",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "37": {
+      "recipe_id": 37,
+      "image_path": "/static/images/recipes/recipe-37-640.webp",
+      "alt": "Thịt heo kho tiêu (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/thit-kho-tieu",
+      "source_image_url": "https://img.agni.vn/agni-mon/thit-kho-tieu-e181de982ea7-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-37-320.webp",
+        "640": "/static/images/recipes/recipe-37-640.webp",
+        "960": "/static/images/recipes/recipe-37-960.webp"
+      },
+      "source_sha256": "e181de982ea7b747bbafa597b8ee3af2cd6ffe06b86267d3388e9937c47fec18",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "38": {
+      "recipe_id": 38,
+      "image_path": "/static/images/recipes/recipe-38-ai-640.webp",
+      "alt": "Thịt băm chưng trứng (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-38-ai-320.webp",
+        "640": "/static/images/recipes/recipe-38-ai-640.webp",
+        "960": "/static/images/recipes/recipe-38-ai-960.webp"
+      },
+      "source_original_filename": "recipe-38.png",
+      "source_sha256": "8ea0b84e1289035e187a7205b139b08346622ed3e81bb2a27d45766ebf3335c7",
+      "source_dimensions": [
+        1585,
+        992
+      ]
+    },
+    "39": {
+      "recipe_id": 39,
+      "image_path": "/static/images/recipes/recipe-39-640.webp",
+      "alt": "Sườn xào chua ngọt (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/suon-xao-chua-ngot",
+      "source_image_url": "https://img.agni.vn/agni-mon/suon-xao-chua-ngot-105c9104cbd5-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-39-320.webp",
+        "640": "/static/images/recipes/recipe-39-640.webp",
+        "960": "/static/images/recipes/recipe-39-960.webp"
+      },
+      "source_sha256": "105c9104cbd5daafd180452be90c7b50f45bd52664eb2afceee95080c1f6ac2c",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "40": {
+      "recipe_id": 40,
+      "image_path": "/static/images/recipes/recipe-40-640.webp",
+      "alt": "Tôm rang me (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/tom-rang-me",
+      "source_image_url": "https://img.agni.vn/agni-mon/tom-rang-me-a24596c65cc8-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-40-320.webp",
+        "640": "/static/images/recipes/recipe-40-640.webp",
+        "960": "/static/images/recipes/recipe-40-960.webp"
+      },
+      "source_sha256": "a24596c65cc8ced8dc0bd6c3d2c83e0a968a7488fd011d61a6e0001f4f3a839a",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "41": {
+      "recipe_id": 41,
+      "image_path": "/static/images/recipes/recipe-41-ai-640.webp",
+      "alt": "Mực xào dứa (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-41-ai-320.webp",
+        "640": "/static/images/recipes/recipe-41-ai-640.webp",
+        "960": "/static/images/recipes/recipe-41-ai-960.webp"
+      },
+      "source_original_filename": "recipe-41.png",
+      "source_sha256": "f051051d51d23f77769af7ca9b7ffedfa57f94fd88294c4eb0a78bd46c4c214c",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "42": {
+      "recipe_id": 42,
+      "image_path": "/static/images/recipes/recipe-42-640.webp",
+      "alt": "Tôm hấp nước dừa (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/tom-hap-nuoc-dua",
+      "source_image_url": "https://img.agni.vn/agni-mon/tom-hap-nuoc-dua-bd6e2955f375-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-42-320.webp",
+        "640": "/static/images/recipes/recipe-42-640.webp",
+        "960": "/static/images/recipes/recipe-42-960.webp"
+      },
+      "source_sha256": "bd6e2955f3753bf63642d6e8323243c0bf53827002166e88b23953d52c952b12",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "43": {
+      "recipe_id": 43,
+      "image_path": "/static/images/recipes/recipe-43-640.webp",
+      "alt": "Đậu phụ nhồi thịt (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/dau-phu-nhoi-thit-sot-ca-chua",
+      "source_image_url": "https://img.agni.vn/agni-mon/dau-phu-nhoi-thit-sot-ca-chua-c3e450e027cf-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-43-320.webp",
+        "640": "/static/images/recipes/recipe-43-640.webp",
+        "960": "/static/images/recipes/recipe-43-960.webp"
+      },
+      "source_sha256": "c3e450e027cfd0f3586c38243d7f89e5eebcdde0353ca1d7613ac84bee3545c7",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "44": {
+      "recipe_id": 44,
+      "image_path": "/static/images/recipes/recipe-44-640.webp",
+      "alt": "Đậu phụ kho nấm (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/dau-phu-kho-nam-rom",
+      "source_image_url": "https://img.agni.vn/agni-mon/dau-phu-kho-nam-rom-0650a5d4fc90-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-44-320.webp",
+        "640": "/static/images/recipes/recipe-44-640.webp",
+        "960": "/static/images/recipes/recipe-44-960.webp"
+      },
+      "source_sha256": "0650a5d4fc90272375ba4ceb29c02d02e871f6e3a779e146cbef35502a1f18bd",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "45": {
+      "recipe_id": 45,
+      "image_path": "/static/images/recipes/recipe-45-ai-640.webp",
+      "alt": "Nấm xào sả (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-45-ai-320.webp",
+        "640": "/static/images/recipes/recipe-45-ai-640.webp",
+        "960": "/static/images/recipes/recipe-45-ai-960.webp"
+      },
+      "source_original_filename": "recipe-45.png",
+      "source_sha256": "19d50a81916a1e7f546d238965525cafe6c14f18ecf740ab2e6aa3b7fe5e43a6",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "46": {
+      "recipe_id": 46,
+      "image_path": "/static/images/recipes/recipe-46-640.webp",
+      "alt": "Gỏi gà rau răm (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/nom-ga-rau-ram",
+      "source_image_url": "https://img.agni.vn/agni-mon/nom-ga-rau-ram-f1b61b00b1ff-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-46-320.webp",
+        "640": "/static/images/recipes/recipe-46-640.webp",
+        "960": "/static/images/recipes/recipe-46-960.webp"
+      },
+      "source_sha256": "f1b61b00b1ff942a91d00cf5c43761328c765a485cc8c8767dc63e2a49a39208",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "47": {
+      "recipe_id": 47,
+      "image_path": "/static/images/recipes/recipe-47-ai-640.webp",
+      "alt": "Nộm dưa leo cà rốt (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-47-ai-320.webp",
+        "640": "/static/images/recipes/recipe-47-ai-640.webp",
+        "960": "/static/images/recipes/recipe-47-ai-960.webp"
+      },
+      "source_original_filename": "recipe-47.png",
+      "source_sha256": "75b4d960c95bbfe510fd16e416abce1d3af9b0440af49e01f06b800e2a8c0cfb",
+      "source_dimensions": [
+        1586,
+        992
+      ]
+    },
+    "48": {
+      "recipe_id": 48,
+      "image_path": "/static/images/recipes/recipe-48-ai-640.webp",
+      "alt": "Bánh tráng cuốn thịt heo (ảnh minh họa do AI tạo)",
+      "source_type": "project_ai",
+      "source_name": "Minh họa AI tạo riêng cho project",
+      "source_url": null,
+      "source_image_url": null,
+      "license_note": "Ảnh AI do chủ project cung cấp; chưa cung cấp tên công cụ, prompt và điều khoản công cụ. Không tuyên bố giấy phép mở.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-48-ai-320.webp",
+        "640": "/static/images/recipes/recipe-48-ai-640.webp",
+        "960": "/static/images/recipes/recipe-48-ai-960.webp"
+      },
+      "source_original_filename": "recipe-48.png",
+      "source_sha256": "973d61fca66e2910034a30696e3a089a020146121ef1c62c507a1ef8cccc7875",
+      "source_dimensions": [
+        1585,
+        992
+      ]
+    },
+    "49": {
+      "recipe_id": 49,
+      "image_path": "/static/images/recipes/recipe-49-640.webp",
+      "alt": "Chả lá lốt (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/cha-la-lot",
+      "source_image_url": "https://img.agni.vn/agni-mon/cha-la-lot-741e72b99c07-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-49-320.webp",
+        "640": "/static/images/recipes/recipe-49-640.webp",
+        "960": "/static/images/recipes/recipe-49-960.webp"
+      },
+      "source_sha256": "741e72b99c07182287ab5805a83843c530124718612e39666bf260209c8cb8e6",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    },
+    "50": {
+      "recipe_id": 50,
+      "image_path": "/static/images/recipes/recipe-50-640.webp",
+      "alt": "Miến gà (ảnh minh họa do AI tạo)",
+      "source_url": "https://agni.vn/mon/mien-ga",
+      "source_image_url": "https://img.agni.vn/agni-mon/mien-ga-0d38b1c10f2a-lg.webp",
+      "source_name": "Ăn Gì? (agni.vn)",
+      "source_owner": "veasy",
+      "license_note": "Sự cho phép riêng do chủ project xác nhận; nội dung/link xác nhận chưa được cung cấp. Không phải giấy phép mở công khai. Xem docs/IMAGE_SOURCE_APPROVAL.md.",
+      "generated_ai": true,
+      "is_placeholder": false,
+      "variants": {
+        "320": "/static/images/recipes/recipe-50-320.webp",
+        "640": "/static/images/recipes/recipe-50-640.webp",
+        "960": "/static/images/recipes/recipe-50-960.webp"
+      },
+      "source_sha256": "0d38b1c10f2ac70d22179e5ce93823de29c2cd2e658379e216a2ed57a834bfad",
+      "source_dimensions": [
+        1200,
+        900
+      ]
+    }
+  }
+}

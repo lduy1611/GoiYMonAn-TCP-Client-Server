@@ -308,12 +308,13 @@ function renderRecommendations(items) {
     showEmpty('Chưa tìm thấy món phù hợp', searching ? 'Thử tên khác, bỏ bớt bộ lọc hoặc tăng thời gian tối đa.' : 'Thử bỏ bớt nguyên liệu loại trừ hoặc tăng thời gian tối đa.');
   } else {
     $('results').innerHTML = items.map((item, index) =>
-      '<article class="recipe-card"><div class="recipe-top"><span class="recipe-rank">' + (searching ? 'Kết quả ' : 'Gợi ý ') + String((searching ? state.offset : 0) + index + 1).padStart(2, '0') + '</span>' + (searching ? '' : '<span class="score" title="Điểm xếp hạng P1 trên thang 1">P1 · ' + Number(item.score).toFixed(2) + '</span>') + '</div>' +
+      '<article class="recipe-card"><figure class="recipe-media" data-recipe-media data-recipe-id="' + item.recipe_id + '" data-recipe-title="' + esc(item.title) + '"></figure><div class="recipe-top"><span class="recipe-rank">' + (searching ? 'Kết quả ' : 'Gợi ý ') + String((searching ? state.offset : 0) + index + 1).padStart(2, '0') + '</span>' + (searching ? '' : '<span class="score" title="Điểm xếp hạng P1 trên thang 1">P1 · ' + Number(item.score).toFixed(2) + '</span>') + '</div>' +
       '<h3><a href="/recipes/' + item.recipe_id + '">' + esc(item.title) + '</a></h3><div class="meta-row"><span>◷ ' + esc(item.minutes) + ' phút</span><span>Thiếu ' + esc(item.missing_count) + ' nguyên liệu bắt buộc</span></div>' +
       '<div class="card-description"><div class="tag-label">Đã có · ' + item.matched_ids.length + '</div><div class="id-list">' + (ingredientTags(item.matched_ids) || 'Chưa có nguyên liệu bắt buộc nào') + '</div>' +
       '<div class="tag-label missing">Còn thiếu · ' + esc(item.missing_count) + '</div><div class="id-list missing">' + (ingredientTags(item.missing_ids) || 'Đã đủ nguyên liệu bắt buộc') + '</div></div>' +
       '<a class="detail-link" href="/recipes/' + item.recipe_id + '">Xem công thức <span aria-hidden="true">→</span></a></article>'
     ).join('');
+    window.RecipeImages?.mount($('results'));
   }
 }
 

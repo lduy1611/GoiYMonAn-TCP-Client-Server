@@ -26,11 +26,12 @@ function renderRecipe(data) {
     ? '<ol class="step-list">' + steps.map(step => '<li>' + escapeHtml(step.replace(/^\s*(?:bước\s*)?\d+[.)\-:]\s*/i, '')) + '</li>').join('') + '</ol>'
     : '<div class="instruction-single"><p>' + (escapeHtml(steps[0]) || 'Chưa có hướng dẫn trong dữ liệu.') + '</p></div>';
   document.title = data.title + ' · Hôm nay ăn gì?';
-  detailRoot.innerHTML = '<header class="detail-heading"><p class="eyebrow">Từ lựa chọn đến bữa ăn</p><h1>' + escapeHtml(data.title) + '</h1><div class="meta-row"><span>◷ ' + escapeHtml(data.minutes) + ' phút</span><span>' + data.ingredients.length + ' nguyên liệu</span></div></header>' +
+  detailRoot.innerHTML = '<header class="detail-heading"><p class="eyebrow">Từ lựa chọn đến bữa ăn</p><h1>' + escapeHtml(data.title) + '</h1><div class="meta-row"><span>◷ ' + escapeHtml(data.minutes) + ' phút</span><span>' + data.ingredients.length + ' nguyên liệu</span></div><figure class="recipe-media detail-media" data-recipe-media data-recipe-id="' + data.id + '" data-recipe-title="' + escapeHtml(data.title) + '"></figure></header>' +
     '<div class="detail-layout"><section class="recipe-ingredients panel" aria-labelledby="ingredients-title"><h2 id="ingredients-title">Chuẩn bị nguyên liệu</h2><p class="field-help">Tích để đánh dấu những gì bạn đã chuẩn bị.</p><ul class="ingredient-list">' +
     data.ingredients.map(item => '<li><label><input type="checkbox" aria-label="Đã chuẩn bị: ' + escapeHtml(item.name) + '"><span class="ingredient-copy"><span>' + escapeHtml(item.name) + '</span><span class="quantity">' + escapeHtml(item.quantity || '') + '</span></span></label></li>').join('') +
     '</ul></section><section class="recipe-instructions" aria-labelledby="instructions-title"><h2 id="instructions-title">Các bước chế biến</h2><p class="field-help">Hướng dẫn từ công thức được lưu trong hệ thống.</p>' + stepsHtml + '</section></div>' +
     '<p class="source">' + sourceMarkup(data.source_url) + '</p>';
+  window.RecipeImages?.mount(detailRoot);
 }
 
 async function loadRecipe() {
