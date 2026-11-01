@@ -1,0 +1,56 @@
+.meal-page .meal-container { max-width: 1440px; }
+.meal-page .meal-hero { padding-bottom: 32px; }
+.meal-page .meal-hero h1 { font-size: clamp(36px, 4.6vw, 56px); }
+.meal-page .meal-kicker { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 18px; padding: 0; list-style: none; color: var(--green); font-size: 12px; margin-top: 22px; }
+.meal-page .meal-kicker li { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.meal-page .meal-kicker span { font-weight: 700; }
+.meal-page .back-home { font-size: 13px; min-height: 44px; display: inline-flex; align-items: center; }
+.meal-page .meal-workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 26px; align-items: start; }
+.meal-page .meal-controls { padding: 22px; min-width: 0; }
+.meal-page h2 { font-size: 24px; line-height: 1.3; margin: 0; letter-spacing: -.025em; }
+.meal-page .meal-ingredients { max-height: 264px; overflow-y: auto; margin-top: 12px; border-block: 1px solid var(--line); }
+.meal-page .ingredient-row { gap: 6px; padding-block: 8px; }
+.meal-page .ingredient-actions { gap: 4px; }
+.meal-page .ingredient-action { font-size: 11px; padding: 6px; min-height: 44px; min-width: 62px; }
+.meal-page .ingredient-name { overflow-wrap: anywhere; }
+.meal-page .meal-selection { margin-top: 18px; }
+.meal-page .meal-selection h3 { display: flex; justify-content: space-between; font-size: 13px; margin: 0 0 8px; }
+.meal-page .meal-selection h3 span { color: var(--muted); font-weight: 400; }
+.meal-page .meal-selection .chips:empty::after { content: 'Chưa chọn nguyên liệu'; font-size: 12px; color: var(--muted); }
+.meal-page .chip button { min-width: 40px; min-height: 40px; }
+.meal-page .meal-filters { display: grid; gap: 14px; margin-top: 22px; }
+.meal-page .meal-filters label { font-size: 13px; font-weight: 650; }
+.meal-page .meal-filters input { display: block; width: 100%; border: 1px solid #cbd5c8; border-radius: 10px; padding: 10px; margin-top: 6px; background: #fbfcf9; font-size: 16px; min-width: 0; }
+.meal-page .meal-results { min-width: 0; scroll-margin-top: 110px; }
+.meal-page .meal-results-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.meal-page .meal-results-heading .retry-button { margin: 0; }
+.meal-page .meal-summary { padding: 14px 18px; border: 1px solid #d6e1cf; border-radius: 12px; background: var(--sage); font-size: 13px; margin: 0 0 18px; }
+.meal-page .meal-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.meal-page .recipe-card { padding: 18px; }
+.meal-page .recipe-card .recipe-media { margin: -18px -18px 16px; }
+.meal-page .recipe-card h3 { font-size: 19px; margin: 12px 0; line-height: 1.4; }
+.meal-page .meal-slot { color: var(--green); background: var(--sage); border-radius: 20px; padding: 4px 9px; align-self: start; font-size: 12px; font-weight: 700; }
+.meal-page .meal-missing { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; margin-bottom: 16px; }
+.meal-page .meal-card-actions { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+.meal-page .meal-card-actions .detail-link { margin: 0; min-height: 44px; align-items: center; display: flex; }
+.meal-page .meal-card-actions button { margin: 0; }
+.meal-page .meal-shopping { padding: 24px; margin-top: 24px; }
+.meal-page .meal-shopping-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.meal-page .meal-shopping h3 { font-size: 15px; }
+.meal-page .shopping-entry { border-top: 1px solid var(--line); padding-block: 12px; overflow-wrap: anywhere; }
+.meal-page .shopping-entry ul { padding-left: 18px; margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.meal-page .meal-message { padding: 14px 18px; border-radius: 12px; background: #fff3dd; color: #734c16; overflow-wrap: anywhere; }
+.meal-page .meal-message.error { background: #fff0e9; color: #8d3d22; }
+.meal-page .empty-state { padding: 36px 24px; }
+@media (max-width: 1100px) {
+  .meal-page .meal-workspace { grid-template-columns: 280px minmax(0, 1fr); gap: 20px; }
+  .meal-page .meal-cards { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .meal-page .meal-workspace { grid-template-columns: 1fr; }
+  .meal-page .meal-controls { padding: 20px; }
+  .meal-page .meal-shopping-columns { grid-template-columns: 1fr; gap: 4px; }
+  .meal-page .meal-shopping { padding: 20px; }
+  .meal-page .meal-kicker { max-width: 260px; margin-inline: auto; line-height: 2; }
+  .meal-page .meal-results-heading .retry-button { width: 100%; }
+}

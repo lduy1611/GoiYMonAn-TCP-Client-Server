@@ -8,13 +8,13 @@
 </head>
 <body>
   <a class="skip-link" href="#detail">Đến nội dung công thức</a>
-  <header class="topbar"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span><span>Hôm nay ăn gì?<small>Từ nguyên liệu trong căn bếp của bạn</small></span></a><a href="/" class="header-link">Chọn món khác <span aria-hidden="true">↗</span></a></header>
+  <header class="topbar"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span><span>Hôm nay ăn gì?<small>Từ nguyên liệu trong căn bếp của bạn</small></span></a><a href="{{ return_to }}" class="header-link">{{ 'Về mâm cơm' if return_to == '/meal-plan' else 'Chọn món khác' }} <span aria-hidden="true">↗</span></a></header>
   <main class="container detail-container">
-    <a href="/" class="back">← Về trang gợi ý</a>
-    <article id="detail" class="detail-card" data-recipe-id="{{ recipe_id }}" aria-busy="true" tabindex="-1"><div class="loading panel" role="status"><span class="spinner" aria-hidden="true"></span>Đang tải công thức…</div></article>
+    <a href="{{ return_to }}" class="back">← {{ 'Về mâm cơm hôm nay' if return_to == '/meal-plan' else 'Về trang gợi ý' }}</a>
+    <article id="detail" class="detail-card" data-recipe-id="{{ recipe_id }}" data-return-to="{{ return_to }}" aria-busy="true" tabindex="-1"><div class="loading panel" role="status"><span class="spinner" aria-hidden="true"></span>Đang tải công thức…</div></article>
   </main>
   <footer>Nguyên liệu và hướng dẫn được hiển thị từ dữ liệu công thức của hệ thống.</footer>
   <script src="/static/recipe-images.js?v=ui-1.2.3" defer></script>
-  <script src="/static/detail.js?v=ui-1.2.3" defer></script>
+  <script src="/static/detail.js?v=ui-1.2.3&amp;fix=return-1" defer></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ from source.common.protocol import ProtocolError, error_response, success_respon
 from source.server.ranking import rank_recipes
 from source.server.repository import Repository
 from source.server.search import search_recipes, validate_search
+from source.server.meal_plan import build_shopping_lists, default_classification, generate_meal_plan, validate_meal_plan
 
 
 def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
@@ -39,6 +40,21 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
             if not repository.ingredient_ids_exist(connection, options.selected | options.excluded):
                 raise ProtocolError("INVALID_PAYLOAD", "ingredient ids are invalid", request_id)
             data = search_recipes(repository.recipes_for_ranking(connection), options)
+            return success_response(request_id, {"dataset_version": version, **data}), op
+        if op == "GENERATE_MEAL_PLAN":
+            options = validate_meal_plan(payload, request_id)
+            if not repository.ingredient_ids_exist(connection, options.selected | options.excluded):
+                raise ProtocolError("INVALID_PAYLOAD", "ingredient ids are invalid", request_id)
+            data = generate_meal_plan(repository.recipes_for_ranking(connection), options,
+                                      default_classification(), request_id)
+            if data["plan"] is not None:
+                details = []
+                for item in data["plan"]["items"]:
+                    recipe = repository.get_recipe(connection, item["recipe_id"])
+                    if recipe is None:
+                        raise ProtocolError("NOT_FOUND", "meal plan recipe no longer exists", request_id)
+                    details.append(recipe)
+                data["plan"].update(build_shopping_lists(details, options.selected))
             return success_response(request_id, {"dataset_version": version, **data}), op
         unknown = set(payload) - {"ingredient_ids", "excluded_ids", "max_minutes", "top_k", "algorithm"}
         selected = payload.get("ingredient_ids")
