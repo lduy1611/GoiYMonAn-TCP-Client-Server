@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import uuid
 from pathlib import Path
 from typing import Any, Literal
@@ -10,10 +11,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, ValidationError
 
 from source.client.tcp_client import TCPClient, TCPClientError
 from source.common.protocol import error_response
+from source.web.meal_plan_contract import MealPlanData, MealPlanRequest
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -95,6 +97,12 @@ def call_tcp(request: Request, op: str, payload: dict[str, Any]) -> JSONResponse
     if response.get("data") is None or response.get("error") is not None:
         response = error_response(request_id, "UPSTREAM_PROTOCOL", "TCP Server trả về response không hợp lệ.")
         return JSONResponse(response, status_code=502, headers={"X-Request-ID": request_id})
+    if op == "GENERATE_MEAL_PLAN":
+        try:
+            MealPlanData.model_validate(response["data"])
+        except ValidationError:
+            response = error_response(request_id, "UPSTREAM_PROTOCOL", "Dữ liệu mâm cơm từ TCP Server không hợp lệ.")
+            return JSONResponse(response, status_code=502, headers={"X-Request-ID": request_id})
     return JSONResponse(response, status_code=200, headers={"X-Request-ID": request_id})
 
 
@@ -104,8 +112,13 @@ def home(request: Request):
 
 
 @app.get("/recipes/{recipe_id}", response_class=HTMLResponse)
-def recipe_page(request: Request, recipe_id: int = FastAPIPath(ge=1)):
-    return templates.TemplateResponse(request=request, name="detail.html", context={"page_title": "Chi tiết món ăn", "recipe_id": recipe_id})
+def recipe_page(request: Request, recipe_id: str):
+    destinations = request.query_params.getlist("return_to")
+    return_to = destinations[0] if len(destinations) == 1 and destinations[0] in {"/", "/meal-plan"} else "/"
+    valid_id = recipe_id.isascii() and recipe_id.isdecimal() and len(recipe_id) <= 10 and 1 <= int(recipe_id) <= 4294967295
+    return templates.TemplateResponse(request=request, name="detail.html", context={
+        "page_title": "Chi tiết món ăn", "recipe_id": int(recipe_id) if valid_id else 0,
+        "return_to": return_to}, status_code=200 if valid_id else 422)
 
 
 @app.get("/api/ingredients")
@@ -137,3 +150,23 @@ def search(request: Request, body: SearchRequest):
 @app.get("/api/health")
 def health(request: Request):
     return call_tcp(request, "PING", {})
+
+
+@app.get("/meal-plan", response_class=HTMLResponse)
+def meal_plan_page(request: Request):
+    # Local catalog version is only a cache hint; the gateway does not classify/select dishes.
+    try:
+        catalog = json.loads((BASE_DIR.parent.parent / "data/recipe_categories.json").read_text(encoding="utf-8"))
+        version = catalog.get("classification_version")
+        if not isinstance(version, str) or not 1 <= len(version) <= 80:
+            version = ""
+    except (OSError, ValueError, AttributeError):
+        version = ""
+    return templates.TemplateResponse(request=request, name="meal_plan.html", context={
+        "page_title": "Mâm cơm hôm nay", "classification_version": version})
+
+
+@app.post("/api/meal-plan")
+def generate_meal_plan(request: Request, body: MealPlanRequest):
+    exclude = {"avoid_recipe_ids"} if not body.avoid_recipe_ids else set()
+    return call_tcp(request, "GENERATE_MEAL_PLAN", body.model_dump(exclude_none=True, exclude=exclude))

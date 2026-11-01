@@ -1,4 +1,5 @@
 const detailRoot = document.getElementById('detail');
+const returnTo = ['/', '/meal-plan'].includes(detailRoot.dataset.returnTo) ? detailRoot.dataset.returnTo : '/';
 const escapeHtml = value => {
   const node = document.createElement('div');
   node.textContent = String(value ?? '');
@@ -37,13 +38,14 @@ function renderRecipe(data) {
 async function loadRecipe() {
   detailRoot.setAttribute('aria-busy', 'true');
   try {
+    if (!Number.isSafeInteger(Number(detailRoot.dataset.recipeId)) || Number(detailRoot.dataset.recipeId) <= 0) throw Error('Đường dẫn công thức không hợp lệ. Hãy quay lại để chọn món.');
     const response = await fetch('/api/recipes/' + detailRoot.dataset.recipeId);
     const envelope = await response.json();
     if (!response.ok || !envelope.ok) throw Error(envelope.error?.message || 'Không tải được công thức.');
     renderRecipe(envelope.data);
   } catch (error) {
     const message = error instanceof TypeError ? 'Không thể kết nối máy chủ. Hãy kiểm tra kết nối và thử lại.' : error.message;
-    detailRoot.innerHTML = '<div class="empty-state panel"><h1>Chưa thể mở công thức</h1><p class="message error" role="alert">' + escapeHtml(message) + '</p><button class="retry-button" id="retry-recipe" type="button">Thử lại</button><p><a href="/">Quay về trang gợi ý</a></p></div>';
+    detailRoot.innerHTML = '<div class="empty-state panel"><h1>Chưa thể mở công thức</h1><p class="message error" role="alert">' + escapeHtml(message) + '</p><button class="retry-button" id="retry-recipe" type="button">Thử lại</button><p><a class="detail-error-back" href="' + returnTo + '">' + (returnTo === '/meal-plan' ? 'Quay về mâm cơm' : 'Quay về trang gợi ý') + '</a></p></div>';
     document.getElementById('retry-recipe').onclick = loadRecipe;
   } finally {
     detailRoot.setAttribute('aria-busy', 'false');
