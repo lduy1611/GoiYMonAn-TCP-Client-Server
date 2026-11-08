@@ -14,14 +14,14 @@ from source.database.seed import seed
 from source.server.main import TCPServer
 
 
-def running_server(tmp_path: Path):
+def running_server(tmp_path: Path, max_connections: int = 32):
     db = tmp_path / "recipes.db"
     seed(db)
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     probe.bind(("127.0.0.1", 0))
     port = probe.getsockname()[1]
     probe.close()
-    server = TCPServer("127.0.0.1", port, db)
+    server = TCPServer("127.0.0.1", port, db, max_connections=max_connections)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     deadline = time.monotonic() + 2
@@ -144,7 +144,9 @@ def test_eof_or_truncated_request_releases_handler(tmp_path: Path, wire):
         thread.join(timeout=2)
 
 
-@pytest.mark.parametrize("code", ["UNKNOWN_OPERATION", "INVALID_PAYLOAD", "INVALID_REQUEST", "UNSUPPORTED_VERSION", "NOT_FOUND"])
+@pytest.mark.parametrize("code", ["UNKNOWN_OPERATION", "INVALID_PAYLOAD", "INVALID_REQUEST", "UNSUPPORTED_VERSION", "NOT_FOUND",
+                                  "ADMIN_UNAUTHORIZED", "ADMIN_WRITE_DENIED", "ADMIN_DRAFT_CONFLICT", "ADMIN_RECIPE_CONFLICT",
+                                  "ADMIN_WRITE_UNAVAILABLE", "ADMIN_SCHEMA_UNAVAILABLE"])
 @pytest.mark.parametrize("send_error", [ConnectionResetError, BrokenPipeError])
 def test_disconnect_while_sending_error_releases_slot(monkeypatch, code, send_error):
     # Deterministic send failure: an OS close/reset is otherwise timing dependent.
@@ -167,7 +169,7 @@ def test_disconnect_while_sending_error_releases_slot(monkeypatch, code, send_er
 
 
 @pytest.mark.parametrize("wire,expected", [
-    (b"", "UPSTREAM_PROTOCOL"),
+    (b"", "UPSTREAM_DISCONNECTED"),
     (b"\x00", "TRUNCATED_FRAME"),
     (b"\x00\x00\x00\x05", "TRUNCATED_FRAME"),
     (b"\x00\x00\x00\x05{", "TRUNCATED_FRAME"),
@@ -199,9 +201,75 @@ def test_persistent_client_discards_broken_socket_and_reconnects(monkeypatch, wi
         recovered_upstream.close()
 
 
+def test_server_admission_backpressure_does_not_drop_second_request(monkeypatch, tmp_path):
+    import source.server.main as server_module
+
+    entered = threading.Event()
+    release = threading.Event()
+    original_dispatch = server_module.dispatch
+
+    def slow_dispatch(repository, request):
+        if request.get("op") == "SLOW_TEST_ONLY":
+            entered.set()
+            assert release.wait(2)
+        return original_dispatch(repository, request)
+
+    monkeypatch.setattr(server_module, "dispatch", slow_dispatch)
+    monkeypatch.setattr(server_module, "LOG_PATH", tmp_path / "TEST_ONLY-admission.jsonl")
+    server, port, thread = running_server(tmp_path, max_connections=1)
+    first_result = []
+    second_result = []
+    first = threading.Thread(target=lambda: first_result.append(TCPClient(port=port).request("SLOW_TEST_ONLY", {})))
+    second = threading.Thread(target=lambda: second_result.append(TCPClient(port=port).request("PING", {})))
+    try:
+        first.start()
+        assert entered.wait(1)
+        second.start()
+        time.sleep(0.15)
+        assert second.is_alive()  # queued; never accepted then silently closed
+        release.set()
+        first.join(2)
+        second.join(2)
+        assert first_result[0]["error"]["code"] == "UNKNOWN_OPERATION"
+        assert second_result[0]["ok"] is True
+        rows = [json.loads(line) for line in (tmp_path / "TEST_ONLY-admission.jsonl").read_text(encoding="utf-8").splitlines()]
+        assert any(row["op"] == "PING" and row["admission_wait_ms"] > 0 for row in rows)
+    finally:
+        release.set()
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def test_admin_recipe_conflict_is_returned_as_framed_response(monkeypatch, tmp_path):
+    import source.server.main as server_module
+
+    monkeypatch.setattr(server_module, "LOG_PATH", tmp_path / "TEST_ONLY-conflict.jsonl")
+
+    original_dispatch = server_module.dispatch
+
+    def conflict(repository, request):
+        if request.get("op") == "ADMIN_SAVE_RECIPE":
+            raise ProtocolError("ADMIN_RECIPE_CONFLICT", "TEST_ONLY recipe conflict", request["request_id"])
+        return original_dispatch(repository, request)
+
+    monkeypatch.setattr(server_module, "dispatch", conflict)
+    server, port, thread = running_server(tmp_path)
+    try:
+        result = TCPClient(port=port).request("ADMIN_SAVE_RECIPE", {"admin_token": "TEST_ONLY"})
+        assert result["ok"] is False
+        assert result["error"]["code"] == "ADMIN_RECIPE_CONFLICT"
+        assert TCPClient(port=port).request("PING", {})["ok"] is True
+        rows = [json.loads(line) for line in (tmp_path / "TEST_ONLY-conflict.jsonl").read_text(encoding="utf-8").splitlines()]
+        sent = next(row for row in rows if row["error_code"] == "ADMIN_RECIPE_CONFLICT" and row["outcome"] == "error_response_sent")
+        assert sent["op"] == "ADMIN_SAVE_RECIPE" and sent["bytes_out"] > 0
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
 @pytest.mark.parametrize("failure,expected", [
     (ProtocolError("TIMEOUT", "frame read deadline exceeded"), "TIMEOUT"),
-    (ConnectionResetError("peer reset"), "UPSTREAM_UNAVAILABLE"),
+    (ConnectionResetError("peer reset"), "UPSTREAM_DISCONNECTED"),
 ])
 def test_persistent_client_closes_socket_on_timeout_or_reset(monkeypatch, failure, expected):
     import source.client.tcp_client as client_module
@@ -221,3 +289,15 @@ def test_persistent_client_closes_socket_on_timeout_or_reset(monkeypatch, failur
         client.close()
         local.close()
         upstream.close()
+
+
+def test_tcp_client_reports_connect_refused_as_unavailable(monkeypatch):
+    def refused(*_args, **_kwargs):
+        raise ConnectionRefusedError(10061, "TEST_ONLY refused")
+
+    monkeypatch.setattr(socket, "create_connection", refused)
+    with pytest.raises(TCPClientError) as caught:
+        TCPClient(port=1).request("PING", {})
+    assert caught.value.code == "UPSTREAM_UNAVAILABLE"
+    assert caught.value.phase == "connect"
+    assert caught.value.os_error == 10061

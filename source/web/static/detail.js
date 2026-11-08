@@ -1,5 +1,6 @@
 const detailRoot = document.getElementById('detail');
-const returnTo = ['/', '/meal-plan'].includes(detailRoot.dataset.returnTo) ? detailRoot.dataset.returnTo : '/';
+const validRecipeID = value => Number.isSafeInteger(value) && (value >= 1 && value <= 4294967295 || value > 4294967296 && value <= 8589934591);
+const returnTo = ['/', '/meal-plan', '/meal-plan/v1'].includes(detailRoot.dataset.returnTo) ? detailRoot.dataset.returnTo : '/';
 const escapeHtml = value => {
   const node = document.createElement('div');
   node.textContent = String(value ?? '');
@@ -38,7 +39,7 @@ function renderRecipe(data) {
 async function loadRecipe() {
   detailRoot.setAttribute('aria-busy', 'true');
   try {
-    if (!Number.isSafeInteger(Number(detailRoot.dataset.recipeId)) || Number(detailRoot.dataset.recipeId) <= 0) throw Error('Đường dẫn công thức không hợp lệ. Hãy quay lại để chọn món.');
+    if (!validRecipeID(Number(detailRoot.dataset.recipeId))) throw Error('Đường dẫn công thức không hợp lệ. Hãy quay lại để chọn món.');
     const response = await fetch('/api/recipes/' + detailRoot.dataset.recipeId);
     const envelope = await response.json();
     if (!response.ok || !envelope.ok) throw Error(envelope.error?.message || 'Không tải được công thức.');

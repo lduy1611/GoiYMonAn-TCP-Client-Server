@@ -55,7 +55,7 @@ try {
   const reloadSnapshot=async snapshot=>{
     // Install after pagehide saves the old document, before the new app reads storage.
     const {identifier}=await send('Page.addScriptToEvaluateOnNewDocument',{source:'sessionStorage.setItem("goiy-meal-plan-v1",'+JSON.stringify(snapshot)+')'});
-    try{await navigate('/meal-plan');await ready();}finally{await send('Page.removeScriptToEvaluateOnNewDocument',{identifier});}
+    try{await navigate('/meal-plan/v1');await ready();}finally{await send('Page.removeScriptToEvaluateOnNewDocument',{identifier});}
   };
   const click=async selector=>{
     await frames();
@@ -88,13 +88,13 @@ try {
   };
   await navigate('/');
   await wait('document.getElementById("ingredient-results").getAttribute("aria-busy")==="false"');
-  await click('[data-select="1"]');await click('#recommend-button');
+  await click('[data-select="1"]');await pause(400);await wait('document.getElementById("results-area").getAttribute("aria-busy")==="false"');
   await wait('document.querySelector(".detail-link")!==null');
   const oldTitles=await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(e=>e.textContent)');
-  await click('a[href="/meal-plan"]');await wait('location.pathname==="/meal-plan"');await ready();
+  await navigate('/meal-plan/v1');await wait('location.pathname==="/meal-plan/v1"');await ready();
   const homeSnapshot=await evaluate('sessionStorage.getItem("goiy-selection-v1")');
   // Fresh document: real Tab/Enter/Space and a hidden skip link.
-  await navigate('/meal-plan');await ready();
+  await navigate('/meal-plan/v1');await ready();
   assert.ok(await evaluate('document.querySelector(".skip-link").getBoundingClientRect().bottom<=0'));
   await key('Tab','Tab',9);assert.equal(await evaluate('document.activeElement.className'),'skip-link');
   await key('Enter','Enter',13);await key('Tab','Tab',9);
@@ -119,20 +119,20 @@ try {
   const beforeShopping=await evaluate('document.getElementById("meal-shopping").textContent');
   await click('[data-meal-slot="main"] .detail-link');await wait('location.pathname==="/recipes/1"&&document.querySelector(".detail-heading h1")!==null');
   const mealSnapshot=await evaluate('JSON.parse(sessionStorage.getItem("goiy-meal-plan-v1"))');
-  assert.equal(await evaluate('document.querySelector(".back").getAttribute("href")'),'/meal-plan');
-  assert.equal(await evaluate('document.querySelector(".header-link").getAttribute("href")'),'/meal-plan');
+  assert.equal(await evaluate('document.querySelector(".back").getAttribute("href")'),'/meal-plan/v1');
+  assert.equal(await evaluate('document.querySelector(".header-link").getAttribute("href")'),'/meal-plan/v1');
   // UI return is an allowlisted link, distinct from native browser Back/Forward.
-  await click('.back');await wait('location.pathname==="/meal-plan"');await ready();
+  await click('.back');await wait('location.pathname==="/meal-plan/v1"');await ready();
   assert.deepEqual(await recipeIDs(),[1,5,29]);assert.equal(posts.length,beforeBack);
   assert.equal(await evaluate('document.getElementById("meal-shopping").textContent'),beforeShopping);
   assert.deepEqual(await evaluate('["meal-max-minutes","meal-max-total","meal-max-missing"].map(id=>document.getElementById(id).value)'),['60','90','2']);
   assert.equal(await evaluate('document.getElementById("meal-selected-count").textContent'),'4/30');
   assert.ok(Math.abs(await evaluate('window.scrollY')-mealSnapshot.scrollY)<=2,'UI return restores scroll');
   await click('[data-meal-slot="main"] .detail-link');await wait('location.pathname==="/recipes/1"&&document.getElementById("detail").getAttribute("aria-busy")==="false"');
-  await historyStep(-1,'/meal-plan');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
+  await historyStep(-1,'/meal-plan/v1');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
   await historyStep(1,'/recipes/1');await wait('document.querySelector(".back")!==null');
-  await click('.header-link');await wait('location.pathname==="/meal-plan"');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
-  await navigate('/meal-plan');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
+  await click('.header-link');await wait('location.pathname==="/meal-plan/v1"');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
+  await navigate('/meal-plan/v1');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
   assert.equal(await evaluate('sessionStorage.getItem("goiy-selection-v1")'),homeSnapshot);
   // Tight filters leave no alternate soup: retain both the dishes and grocery list.
   const shopping=await evaluate('document.getElementById("meal-shopping").textContent');
@@ -172,7 +172,7 @@ try {
     assert.deepEqual(JSON.parse(posts.at(-1).postData).locked_slots,['main','vegetable']);
     if(n===1){
       const h=await evaluate('JSON.parse(sessionStorage.getItem("goiy-meal-plan-v1")).history');
-      const beforeReload=await recipeIDs();await navigate('/meal-plan');await ready();
+      const beforeReload=await recipeIDs();await navigate('/meal-plan/v1');await ready();
       assert.deepEqual(await recipeIDs(),beforeReload);
       assert.deepEqual(await evaluate('JSON.parse(sessionStorage.getItem("goiy-meal-plan-v1")).history'),h);
     }

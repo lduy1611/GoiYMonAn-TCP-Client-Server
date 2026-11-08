@@ -1,0 +1,70 @@
+{
+  "format": "data-v2-portion-review-manifest-1",
+  "prepared_on": "2026-11-05",
+  "timezone": "Asia/Saigon",
+  "workflow_status": "PROPOSED_FOR_REVIEW",
+  "review_status": "NEEDS_VERIFICATION",
+  "import_allowed": false,
+  "legacy_recipe_ids": [
+    30,
+    29,
+    9
+  ],
+  "source_count": 3,
+  "proposed_revision_count": 3,
+  "total_rows": 31,
+  "named_ingredient_usage_rows": 28,
+  "unresolved_instruction_rows": 3,
+  "quantity_kinds": {
+    "exact": 22,
+    "unknown": 4,
+    "to_taste": 3,
+    "range": 2
+  },
+  "source_observed_numeric_rows": 24,
+  "proposed_mapped_ingredient_rows": 5,
+  "source_observed_base_servings": 3,
+  "approved_recipe_count": 0,
+  "full_quantified_shopping_ready_count": 0,
+  "recipe_and_ingredient_ids_namespace": "legacy IDs for draft mapping only; no v2 IDs allocated",
+  "outputs_sha256": {
+    "ingredient-lines.csv": "fcc4caa7e462a072f00c16a2826224b979cee11ded4bbe77413edb78610dc3e7",
+    "proposed-revisions.json": "39c79747df405e67aea7dda0a0bcabc5a5dfeea58bed0acd8b4bf2fdf599b466",
+    "REVIEW.md": "745fdf02218158b5a12c37fbf13e183d31205c875256080a0f164cb82fee1a05",
+    "validation-report.json": "53462eb512f91984c0dcca1af0f0e13f0d4fb519b56d068b9a29aa2bf48191af"
+  },
+  "input_documents_sha256": {
+    "docs/data-v2/audit-summary.json": "f94d5eec503686d8cc03fbba4456ce3bc141bc823863263a6d650e3d575c3e13",
+    "docs/data-v2/coverage-review.csv": "a9376213e3fe7000cc55c7c8e6dd0ff2ad749e8fe2fafe7e6028404691ca403b",
+    "docs/data-v2/coverage-targets.csv": "34899f9958773fddc8c336016f4fe916b1c37c465c1898374157b0b6efa5cb78",
+    "docs/data-v2/findings-review.csv": "4569d8824c76b86ecf0ee430ffea25233c6febf23e3ac2990dab86e7b8164d04",
+    "docs/data-v2/ingredients-review.csv": "e070364888deeab3aa59dad82bd82918bbd35363bd765b7f26d7caf06cc4158d",
+    "docs/data-v2/README.md": "ddc86056ff7225721b7eaeaca37d8e618cb27bfcf37d75e16eede32bb11cae97",
+    "docs/data-v2/recipes-review.csv": "05107b2a3b96e471010b42af9c11753020841d4818bff448974b9977b0c951ef",
+    "docs/data-v2/relations-review.csv": "1c60d2ab0e6c6743e663ff336a51d84dae149c529b1143de90b06f54ee2d562b",
+    "docs/data-v2/SCHEMA_AND_MIGRATION.md": "e8d30b05b14ac0211f78496b4d29be0b9459ca4046d39e0034f3c59025b31d11",
+    "docs/data-v2/VALIDATION_PLAN.md": "19e53bc0a180381f018f63d22d634158fa32174678669ac33ee9447eb80d4a8b",
+    "docs/data-v2/pilot-12/CALCULATION_CHECKS.md": "ae03b0646bee9805e8826e5d57811520638007d767baf70c5d58b4fd9341e613",
+    "docs/data-v2/pilot-12/instruction-gaps.csv": "9cfcf9b903cd32ea0ea0bf3f8788c00159211964d1e00e938180cfc746f85de6",
+    "docs/data-v2/pilot-12/manifest.json": "ca1469b82380de3a57388643ccd02d262c842f6b3832be5efe3dd2ef2591a365",
+    "docs/data-v2/pilot-12/pilot-ingredient-lines.csv": "0091ad8b24482c3711d8cac772af807c74754164c5cff15c2b23623d66e42eed",
+    "docs/data-v2/pilot-12/pilot-recipes.csv": "f01c802f257057040a7bffc618136fa744810f442f3654f0c773f0e44c7db65e",
+    "docs/data-v2/pilot-12/README.md": "c24ba08f780edef6384ccf5ed02d9c7025023ac9d3fb172ee9a9f1b6432857a3",
+    "docs/data-v2/pilot-12/source-register.csv": "8b89e670c575a92d80e478428a31ac193ee3b3303283209dfb678c57f63a4d24",
+    "docs/data-v2/pilot-12/SOURCES_AND_REVIEW.md": "c2fe8a522d92daa48c5abe82b09ba5133dfc0824272ca9856dcddee4d8239427",
+    "docs/data-v2/pilot-12/verification-tasks.csv": "60b0b1b9975b0d1f5174741a375a1e566057b445036dd825e3ea626ccabe1289"
+  },
+  "existing_documents_unchanged": true,
+  "tracked_diff_sha256_before": "335a6c5b7ac1dd8fd22c1ab7ac04d11879749c09975180bcaf69f67d4994d0ba",
+  "tracked_diff_sha256_after": "335a6c5b7ac1dd8fd22c1ab7ac04d11879749c09975180bcaf69f67d4994d0ba",
+  "tag_v1_0_report": "4a2afc1041515cdfada9145dbda4b5de47dd140a",
+  "source_snapshot_note": "No source HTML snapshot archived; output hashes authenticate dossier files only.",
+  "database_connected": false,
+  "migration_executed": false,
+  "validation": {
+    "report": "validation-report.json",
+    "result": "PASS",
+    "passed": 42,
+    "failed": 0
+  }
+}

@@ -25,7 +25,9 @@ def test_meal_page_and_home_link_preserve_existing_routes(meal_web):
     web, _ = meal_web
     page = web.get("/meal-plan")
     assert page.status_code == 200 and 'data-classification-version="meal-categories-v1"' in page.text
-    assert 'id="meal-form"' in page.text and '/static/meal-plan.js?v=meal-web-2' in page.text
+    assert 'id="meal-form"' in page.text and '/static/meal-plan-v2.js?v=meal-vegetarian-1' in page.text
+    assert 'id="meal-count-main"' not in page.text and 'id="meal-structure"' in page.text
+    assert 'id="meal-people"' in page.text and 'id="meal-portions-retry"' in page.text
     assert 'href="/meal-plan"' in web.get("/").text
     assert web.get("/recipes/1").status_code == 200
     assert web.post("/api/recommend", json={"ingredient_ids":[1,2]}).json()["data"]["algorithm"] == "proposed"

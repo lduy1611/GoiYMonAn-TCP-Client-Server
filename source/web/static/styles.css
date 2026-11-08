@@ -32,6 +32,11 @@ a { color: var(--green); text-underline-offset: 4px; }
 .status-pill::before { content: ""; width: 7px; height: 7px; background: currentColor; border-radius: 50%; flex-shrink: 0; }
 .status-pill.offline { background: #fff0e9; color: #974024; }
 .header-link { font-size: 14px; font-weight: 650; text-decoration: none; }
+.topbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+.account-entry { display:flex; align-items:center; gap:8px; }
+.account-nav-link,.account-nav-register { min-height:38px; padding:7px 12px; border:1px solid var(--line); border-radius:5px; background:var(--paper); color:var(--green-dark); font:inherit; font-size:12px; font-weight:700; text-decoration:none; }
+.account-nav-register { background:var(--green); border-color:var(--green); color:#fff; }
+.account-nav-name { max-width:140px; overflow:hidden; text-overflow:ellipsis; color:var(--green-dark); font-size:12px; font-weight:700; }
 .container { max-width: 1240px; margin: 0 auto; padding: 48px 24px 72px; }
 .hero { text-align: center; padding: 4px 0 32px; }
 .eyebrow { text-transform: uppercase; letter-spacing: .12em; color: var(--orange); font-size: 11px; font-weight: 750; margin: 0 0 10px; }
@@ -168,6 +173,7 @@ footer { text-align: center; color: var(--muted); border-top: 1px solid var(--li
 }
 @media (max-width: 760px) {
   .topbar { min-height: 76px; padding: 12px 18px; flex-wrap: wrap; gap: 8px; }
+  .topbar-actions { width:100%; justify-content:space-between; }
   .brand { font-size: 17px; }
   .brand small { font-size: 10px; }
   .status-pill { padding: 5px 9px; font-size: 10px; }
@@ -196,3 +202,7 @@ footer { text-align: center; color: var(--muted); border-top: 1px solid var(--li
   .results-heading h2 { font-size: 27px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Keep automatic update status out of document flow to preserve scroll position. */
+#results-area { position: relative; }
+#results-area > .loading { position: absolute; top: 0; right: 0; z-index: 2; max-width: 100%; padding: 10px 14px; font-size: 13px; pointer-events: none; }

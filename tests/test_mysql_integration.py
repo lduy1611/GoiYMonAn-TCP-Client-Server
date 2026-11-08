@@ -71,6 +71,22 @@ def test_mysql_tcp_operations(mysql_server):
     assert response.status_code == 200
     assert response.headers["x-request-id"] == response.json()["request_id"]
     assert response.json()["data"]["total"] == search["data"]["total"]
+    fish = client.request("SEARCH_RECIPES", {"query": "cá", "limit": 20})["data"]
+    assert fish["items"][0]["title"] == "Cá basa kho gừng"
+    assert all(item["title"] != "Canh gà nấm hương" for item in fish["items"])
+    with TestClient(app) as web:
+        first = web.post("/api/search", json={"query": "cá", "limit": 1}).json()["data"]
+    assert first["items"] == fish["items"][:1] and first["total"] == fish["total"]
+    flexible = client.request("GENERATE_MEAL_PLAN_V2", {"counts": {"main": 2, "vegetable": 2, "soup": 2}})
+    assert flexible["ok"] and flexible["data"]["algorithm"] == "meal-plan-v2"
+    items = flexible["data"]["plan"]["items"]
+    assert len(items) == len({i["recipe_id"] for i in items}) == 6
+    old = {i["slot"]: i["recipe_id"] for i in items}
+    pinned = client.request("GENERATE_MEAL_PLAN_V2", {
+        "counts": {"main": 2, "vegetable": 2, "soup": 2}, "current_plan": old,
+        "locked_slots": ["main:1", "vegetable:1"], "action": "regenerate"})["data"]
+    updated = {i["slot"]: i["recipe_id"] for i in pinned["plan"]["items"]}
+    assert all(updated[k] == old[k] for k in ("main:1", "vegetable:1"))
 
 
 def test_mysql_multiclient_and_http_outage(mysql_server):

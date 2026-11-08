@@ -83,7 +83,8 @@ def test_tcp_search_without_ingredients_and_no_score(web_with_tcp, query):
     try:
         response = client.request("SEARCH_RECIPES", {"query": query}, request_id=REQUEST_ID)
         assert response["version"] == 1 and response["request_id"] == REQUEST_ID and response["ok"]
-        assert [item["recipe_id"] for item in response["data"]["items"]] == [1, 3, 10]
+        # Recipe 2 contains eggs, but its title does not: it follows all title hits.
+        assert [item["recipe_id"] for item in response["data"]["items"]] == [1, 3, 10, 2]
         assert all(item["missing_count"] == len(item["missing_ids"]) > 0 for item in response["data"]["items"])
         assert all(not item["matched_ids"] and "score" not in item for item in response["data"]["items"])
         assert client.request("PING", {})["ok"]

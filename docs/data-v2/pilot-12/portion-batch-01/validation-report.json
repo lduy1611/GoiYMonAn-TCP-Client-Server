@@ -1,0 +1,178 @@
+{
+  "checked_on": "2026-11-05",
+  "scope": "Dossier structure, source-reference integrity and preservation only; no database, cooking, scaling or application tests executed.",
+  "result": "PASS",
+  "check_count": 42,
+  "passed": 42,
+  "failed": 0,
+  "checks": [
+    {
+      "check": "three distinct proposals from the existing pilot",
+      "passed": true
+    },
+    {
+      "check": "one distinct article per proposal",
+      "passed": true
+    },
+    {
+      "check": "source pages directly inspected, not search snippets",
+      "passed": true
+    },
+    {
+      "check": "all recipe/source decisions await review",
+      "passed": true
+    },
+    {
+      "check": "no automatic import or database ID allocation",
+      "passed": true
+    },
+    {
+      "check": "reviewers/dates not invented",
+      "passed": true
+    },
+    {
+      "check": "base servings match directly observed source values",
+      "passed": true
+    },
+    {
+      "check": "source servings are not adult equivalents",
+      "passed": true
+    },
+    {
+      "check": "complete csv row count and kinds",
+      "passed": true
+    },
+    {
+      "check": "named uses and unresolved markers separated",
+      "passed": true
+    },
+    {
+      "check": "all ingredient IDs exist in read-only catalog",
+      "passed": true
+    },
+    {
+      "check": "candidate IDs are valid but not silently assigned",
+      "passed": true
+    },
+    {
+      "check": "only five identity mapping proposals populated",
+      "passed": true
+    },
+    {
+      "check": "exact amounts are positive decimal strings with source unit",
+      "passed": true
+    },
+    {
+      "check": "range endpoints preserved without scalar/midpoint",
+      "passed": true
+    },
+    {
+      "check": "unknown and to-taste amounts never become zero",
+      "passed": true
+    },
+    {
+      "check": "unresolved instructions are not fake ingredients",
+      "passed": true
+    },
+    {
+      "check": "local evidence references only: 30",
+      "passed": true
+    },
+    {
+      "check": "unique sequential line numbers: 30",
+      "passed": true
+    },
+    {
+      "check": "csv agrees with JSON and own source: 30",
+      "passed": true
+    },
+    {
+      "check": "local evidence references only: 29",
+      "passed": true
+    },
+    {
+      "check": "unique sequential line numbers: 29",
+      "passed": true
+    },
+    {
+      "check": "csv agrees with JSON and own source: 29",
+      "passed": true
+    },
+    {
+      "check": "local evidence references only: 9",
+      "passed": true
+    },
+    {
+      "check": "unique sequential line numbers: 9",
+      "passed": true
+    },
+    {
+      "check": "csv agrees with JSON and own source: 9",
+      "passed": true
+    },
+    {
+      "check": "all csv field review statuses pending",
+      "passed": true
+    },
+    {
+      "check": "unknown form/quantity observation statuses explicit",
+      "passed": true
+    },
+    {
+      "check": "measurement and scaling basis are not guessed",
+      "passed": true
+    },
+    {
+      "check": "no approved conversions manufactured",
+      "passed": true
+    },
+    {
+      "check": "pumpkin approximate mass stays alternate, not extra use",
+      "passed": true
+    },
+    {
+      "check": "bone identity not replaced by ribs",
+      "passed": true
+    },
+    {
+      "check": "seasoning uses retained separately by stage",
+      "passed": true
+    },
+    {
+      "check": "soup and wash water not collapsed",
+      "passed": true
+    },
+    {
+      "check": "source vegetable amount does not fall back to legacy",
+      "passed": true
+    },
+    {
+      "check": "count ranges and source water preserved",
+      "passed": true
+    },
+    {
+      "check": "no false complete-calculation claim",
+      "passed": true
+    },
+    {
+      "check": "all original data-v2 documents preserved",
+      "passed": true
+    },
+    {
+      "check": "protected report tag preserved",
+      "passed": true
+    },
+    {
+      "check": "existing tracked modifications unchanged",
+      "passed": true
+    },
+    {
+      "check": "all existing output hashes match",
+      "passed": true
+    },
+    {
+      "check": "new batch contains only dossier data/documents",
+      "passed": true
+    }
+  ]
+}

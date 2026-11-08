@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f0e5">
+  <title>{{ page_title }}</title>
+  <link rel="stylesheet" href="/static/account.css?v=accounts-20261106">
+</head>
+<body class="account-page" data-mode="{{ mode }}">
+  <main class="account-shell">
+    <a class="account-brand" href="/" aria-label="Về trang chủ">
+      <span class="account-brand-mark" aria-hidden="true">✳</span>
+      <span>Hôm nay ăn gì?<small>Gợi ý vừa với căn bếp của bạn</small></span>
+    </a>
+    <section class="account-card" aria-labelledby="account-title">
+      <a class="account-back" href="/">← Trở về chọn món</a>
+      <p class="account-kicker">TÀI KHOẢN NGƯỜI DÙNG</p>
+      <h1 id="account-title">{{ 'Chào mừng bạn trở lại' if mode == 'login' else 'Tạo tài khoản mới' }}</h1>
+      <p class="account-intro">{{ 'Đăng nhập để dùng các tiện ích cá nhân khi chúng sẵn sàng.' if mode == 'login' else 'Tạo tài khoản để chuẩn bị cho các tiện ích cá nhân sắp tới.' }}</p>
+      <form id="account-form" data-mode="{{ mode }}" novalidate>
+        <label for="account-username">Tên đăng nhập</label>
+        <input id="account-username" name="username" autocomplete="username" minlength="3" maxlength="32" required placeholder="Ví dụ: bepnhaminh">
+        <p class="account-hint">3–32 ký tự: chữ Latin, số, dấu chấm, gạch ngang hoặc gạch dưới.</p>
+        <label for="account-password">Mật khẩu</label>
+        <input id="account-password" name="password" type="password" autocomplete="{{ 'current-password' if mode == 'login' else 'new-password' }}" minlength="{{ 1 if mode == 'login' else 12 }}" maxlength="256" required placeholder="{{ 'Nhập mật khẩu' if mode == 'login' else 'Ít nhất 12 ký tự' }}">
+        {% if mode == 'register' %}
+        <label for="account-password-confirmation">Nhập lại mật khẩu</label>
+        <input id="account-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="12" maxlength="256" required placeholder="Nhập lại mật khẩu">
+        {% endif %}
+        <button id="account-submit" type="submit">{{ 'Đăng nhập' if mode == 'login' else 'Tạo tài khoản' }} <span aria-hidden="true">→</span></button>
+      </form>
+      <p id="account-message" class="account-message" role="status" aria-live="polite"></p>
+      <p class="account-switch">{{ 'Chưa có tài khoản?' if mode == 'login' else 'Đã có tài khoản?' }}
+        <a href="{{ '/account/register' if mode == 'login' else '/account/login' }}">{{ 'Đăng ký' if mode == 'login' else 'Đăng nhập' }}</a>
+      </p>
+      <p class="account-guest">Bạn vẫn có thể <a href="/">tìm món và tạo mâm cơm với tư cách khách</a>.</p>
+    </section>
+    <footer class="account-footer">Công thức rõ ràng, bữa cơm nhẹ nhàng.</footer>
+  </main>
+  <script src="/static/account-auth.js?v=accounts-20261106" defer></script>
+</body>
+</html>

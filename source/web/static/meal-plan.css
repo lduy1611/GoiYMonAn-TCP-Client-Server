@@ -1,4 +1,7 @@
 .meal-page .meal-container { max-width: 1440px; }
+.meal-page .recipe-card.is-pinned { outline: 2px solid var(--green); outline-offset: 2px; }
+.meal-page .meal-pin { min-height: 44px; margin: 0 18px 12px; align-self: start; }
+.meal-page .meal-pin[aria-pressed="true"] { background: var(--sage); color: var(--green); }
 .meal-page .meal-hero { padding-bottom: 32px; }
 .meal-page .meal-hero h1 { font-size: clamp(36px, 4.6vw, 56px); }
 .meal-page .meal-kicker { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 18px; padding: 0; list-style: none; color: var(--green); font-size: 12px; margin-top: 22px; }
@@ -21,10 +24,21 @@
 .meal-page .meal-filters { display: grid; gap: 14px; margin-top: 22px; }
 .meal-page .meal-filters label { font-size: 13px; font-weight: 650; }
 .meal-page .meal-filters input { display: block; width: 100%; border: 1px solid #cbd5c8; border-radius: 10px; padding: 10px; margin-top: 6px; background: #fbfcf9; font-size: 16px; min-width: 0; }
+.meal-page .meal-filters select { display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 6px; padding: 10px; border: 1px solid #cbd5c8; border-radius: 10px; background: #fbfcf9; font-size: 16px; }
+.meal-page .meal-filters > .field-help { margin: -8px 0 0; overflow-wrap: anywhere; }
 .meal-page .meal-results { min-width: 0; scroll-margin-top: 110px; }
 .meal-page .meal-results-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .meal-page .meal-results-heading .retry-button { margin: 0; }
 .meal-page .meal-summary { padding: 14px 18px; border: 1px solid #d6e1cf; border-radius: 12px; background: var(--sage); font-size: 13px; margin: 0 0 18px; }
+.meal-page .meal-people { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 18px; margin-bottom: 18px; }
+.meal-page .meal-people h3 { margin: 0; font-size: 17px; }
+.meal-page .meal-people .field-help { margin: 6px 0 0; }
+.meal-page #meal-people-help { flex-basis: 100%; }
+.meal-page .meal-people-stepper { display: flex; align-items: center; gap: 8px; }
+.meal-page .meal-people-stepper button { min-width: 44px; min-height: 44px; margin: 0; font-size: 20px; }
+.meal-page .meal-people-stepper output { min-width: 64px; text-align: center; font-weight: 650; }
+.meal-page #meal-portions { overflow-wrap: anywhere; }
+.meal-page #meal-portions-reasons h3, .meal-page #meal-portions-known h3 { font-size: 16px; }
 .meal-page .meal-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .meal-page .recipe-card { padding: 18px; }
 .meal-page .recipe-card .recipe-media { margin: -18px -18px 16px; }

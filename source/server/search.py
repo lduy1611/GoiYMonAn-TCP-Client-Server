@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 import unicodedata
 from typing import Any, Iterable
 
@@ -52,11 +53,31 @@ def validate_search(payload: dict[str, Any], request_id: str) -> SearchOptions:
 
 
 def search_recipes(recipes: Iterable[dict[str, Any]], options: SearchOptions) -> dict[str, Any]:
-    query = fold_name(options.query)
+    # Accented queries retain their meaning: cá must not become cà or canh.
+    # Only an unaccented query opts into accent-insensitive matching.
+    def normalized(value: str) -> str:
+        return " ".join(unicodedata.normalize("NFC", value.casefold()).split())
+
+    query = normalized(options.query)
+    accented = query != fold_name(query)
+    pattern = re.compile(r"(?<!\w)" + re.escape(query) + r"(?!\w)")
+
+    def quality(value: str) -> tuple[int, int] | None:
+        text = normalized(value)
+        candidates = [(text, 0)]
+        if not accented:
+            candidates.append((fold_name(text), 1))
+        keys = []
+        for candidate, accent_penalty in candidates:
+            match = pattern.search(candidate)
+            if match:
+                kind = 0 if candidate == query else 1 if match.start() == 0 else 2
+                keys.append((kind, accent_penalty))
+        return min(keys) if keys else None
+
     matches = []
     for recipe in recipes:
-        title = fold_name(recipe["title"])
-        if query not in title or set(recipe["all_ids"]) & options.excluded:
+        if set(recipe["all_ids"]) & options.excluded:
             continue
         if options.max_minutes is not None and recipe["minutes"] > options.max_minutes:
             continue
@@ -65,7 +86,18 @@ def search_recipes(recipes: Iterable[dict[str, Any]], options: SearchOptions) ->
         missing = required - options.selected
         if options.max_missing is not None and len(missing) > options.max_missing:
             continue
-        relevance = 0 if not query or title == query else 1 if title.startswith(query) else 2
+        if not query:
+            relevance = (0, 0, 0)
+        else:
+            title_quality = quality(recipe["title"])
+            if title_quality is not None:
+                relevance = (0, *title_quality)
+            else:
+                ingredient_quality = [key for name in recipe.get("ingredient_names", [])
+                                      if (key := quality(name)) is not None]
+                if not ingredient_quality:
+                    continue
+                relevance = (1, *min(ingredient_quality))
         item = {
             "recipe_id": recipe["id"], "title": recipe["title"], "minutes": recipe["minutes"],
             "matched_ids": sorted(matched), "missing_ids": sorted(missing), "missing_count": len(missing),

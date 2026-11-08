@@ -5,4 +5,5 @@ httpx==0.28.1
 pytest==9.2.0
 mysql-connector-python==26.10.0
 python-dotenv==1.2.4
+Pillow>=10.0,<13
 matplotlib==3.11.2

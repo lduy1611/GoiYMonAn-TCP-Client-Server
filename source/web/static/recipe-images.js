@@ -5,6 +5,7 @@
   const catalogUrl = '/static/recipe-images.json?v=ui-1.2.3';
   const mounted = new WeakSet();
   let catalogPromise;
+  const uploadedImagePromises = new Map();
 
   function localImagePath(value) {
     return typeof value === 'string' && /^\/static\/images\/recipes\/[a-z0-9][a-z0-9._-]*\.(?:webp|jpe?g|png|svg)$/.test(value);
@@ -15,6 +16,18 @@
       const url = new URL(value);
       return ['https:', 'http:'].includes(url.protocol) ? url.href : null;
     } catch { return null; }
+  }
+
+  function loadUploadedImage(id) {
+    if (!uploadedImagePromises.has(id)) {
+      uploadedImagePromises.set(id, fetch('/api/recipes/' + encodeURIComponent(id) + '/image', {credentials: 'same-origin'})
+        .then(response => response.ok ? response.json() : null)
+        .then(envelope => envelope?.ok === true && envelope.data?.image &&
+          typeof envelope.data.image_url === 'string' && new RegExp('^/media/recipes/' + id + '\\?v=[a-f0-9]{64}$').test(envelope.data.image_url)
+          ? envelope.data.image_url : null)
+        .catch(() => null));
+    }
+    return uploadedImagePromises.get(id);
   }
 
   function load() {
@@ -57,7 +70,15 @@
       });
       showPlaceholder();
       figure.replaceChildren(image, caption);
-      load().then(catalog => {
+      Promise.all([load(), loadUploadedImage(id)]).then(([catalog, uploadedPath]) => {
+        if (uploadedPath) {
+          image.dataset.placeholder = 'false';
+          image.dataset.sourceType = 'admin_upload';
+          image.alt = 'Ảnh món ' + title;
+          image.src = uploadedPath;
+          caption.textContent = 'Ảnh do quản trị viên cung cấp';
+          return;
+        }
         const entry = catalog.recipes[String(id)];
         if (!entry || entry.recipe_id !== id || entry.is_placeholder !== false || entry.image_path === placeholder || !localImagePath(entry.image_path)) return;
         const url = sourceLink(entry.source_url);
