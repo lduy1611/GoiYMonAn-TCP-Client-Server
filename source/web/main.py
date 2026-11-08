@@ -134,7 +134,7 @@ class AdminRecipeStateRequest(BaseModel):
 
 class AdminLegacyIngredientLine(BaseModel):
     model_config=ConfigDict(extra="forbid")
-    ingredient_id:StrictInt=Field(gt=0,lt=2**32)
+    ingredient_id:StrictInt=Field(gt=0,lt=2**33)
     quantity:StrictStr=Field(max_length=255)
     # Kept for old clients; Admin edits now make every ingredient required.
     is_required:StrictBool=True
@@ -148,6 +148,19 @@ class AdminLegacyRecipeUpdate(BaseModel):
     minutes:StrictInt=Field(ge=1,le=240)
     ingredients:list[AdminLegacyIngredientLine]=Field(min_length=1,max_length=100)
     is_visible:StrictBool
+    expected_version:StrictStr=Field(min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$")
+
+
+class AdminRecipeSnapshotCreate(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    kind:Literal["legacy","v2"]
+    revision_id:StrictInt|None=Field(default=None,gt=0,lt=2**64)
+
+
+class AdminRecipeSnapshotRestore(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    snapshot_id:StrictStr=Field(min_length=36,max_length=36,pattern=r"^[0-9a-fA-F-]{36}$")
+    expected_version:StrictStr=Field(min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$")
 
 
 class AdminLegacyVisibility(BaseModel):
@@ -582,6 +595,78 @@ def admin_update_legacy_recipe(request:Request,recipe_id:int=FastAPIPath(ge=1,lt
     data["ingredients"]=[{**line,"is_required":True} for line in data["ingredients"]]
     payload,error=_admin_tcp(request,{"recipe_id":recipe_id,**data},csrf=request.headers.get("x-csrf-token",""))
     return error or call_tcp(request,"ADMIN_UPDATE_LEGACY_RECIPE",payload)
+
+
+@app.post("/api/admin/recipes/{recipe_id}/snapshot")
+def admin_create_recipe_snapshot(request:Request,recipe_id:int=FastAPIPath(ge=1,lt=2**64),body:AdminRecipeSnapshotCreate|None=None):
+    from source.common.protocol import success_response
+    from source.common.catalog_ids import UINT32_MAX,valid_public_id
+    from source.web import recipe_snapshots
+    if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","snapshot kind is required"),status_code=422)
+    if not valid_public_id(recipe_id) or (recipe_id<=UINT32_MAX)!=(body.kind=="legacy"):
+        return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","snapshot recipe identity does not match its catalog kind"),status_code=422)
+    if (body.kind=="legacy" and body.revision_id is not None) or (body.kind=="v2" and body.revision_id is None):
+        return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","legacy snapshots omit revision_id; v2 snapshots require it"),status_code=422)
+    auth,error=_admin_tcp(request,{},csrf=request.headers.get("x-csrf-token",""))
+    if error:return error
+    if body.kind=="legacy":
+        response=call_tcp(request,"ADMIN_GET_LEGACY_RECIPE",{"recipe_id":recipe_id,**auth})
+    else:
+        response=call_tcp(request,"ADMIN_GET_RECIPE",{"revision_id":body.revision_id,**auth})
+    envelope=_tcp_envelope(response)
+    if response.status_code>=400 or envelope.get("ok") is not True:return response
+    recipe=envelope.get("data") or {}
+    if body.kind=="v2" and (recipe.get("recipe_id")!=recipe_id or recipe.get("revision_id")!=body.revision_id):
+        return JSONResponse(error_response(_request_id(request),"ADMIN_RECIPE_CONFLICT","revision identity changed; reload before taking a snapshot"),status_code=409)
+    image_response=call_tcp(request,"ADMIN_GET_RECIPE_IMAGE",{"recipe_id":recipe_id,**auth})
+    image_envelope=_tcp_envelope(image_response)
+    if image_response.status_code>=400 or image_envelope.get("ok") is not True:return image_response
+    image_data=image_envelope.get("data") or {}
+    image={"metadata":image_data.get("image"),"fallback_url":_legacy_fallback_image(recipe_id) if body.kind=="legacy" else "/static/images/recipes/placeholder.svg"}
+    try:
+        result=recipe_snapshots.create(body.kind,recipe_id,recipe,image,revision_id=body.revision_id)
+    except recipe_snapshots.SnapshotError as exc:
+        return JSONResponse(error_response(_request_id(request),"ADMIN_SNAPSHOT_ERROR",str(exc)),status_code=409)
+    return JSONResponse(success_response(_request_id(request),result),headers={"X-Request-ID":_request_id(request)})
+
+
+@app.post("/api/admin/recipes/{recipe_id}/restore")
+def admin_restore_recipe_snapshot(request:Request,recipe_id:int=FastAPIPath(ge=1,lt=2**64),body:AdminRecipeSnapshotRestore|None=None):
+    from source.common.catalog_ids import UINT32_MAX,valid_public_id
+    from source.web import recipe_snapshots
+    if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","snapshot ID and expected version are required"),status_code=422)
+    if not valid_public_id(recipe_id):return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","recipe ID is invalid"),status_code=422)
+    auth,error=_admin_tcp(request,{},csrf=request.headers.get("x-csrf-token",""))
+    if error:return error
+    try:snapshot=recipe_snapshots.load(body.snapshot_id)
+    except recipe_snapshots.SnapshotError as exc:
+        return JSONResponse(error_response(_request_id(request),"NOT_FOUND",str(exc)),status_code=404)
+    kind="legacy" if recipe_id<=UINT32_MAX else "v2"
+    if snapshot["recipe_id"]!=recipe_id or snapshot["kind"]!=kind:
+        return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","snapshot belongs to a different recipe"),status_code=422)
+    if kind=="legacy":
+        current_response=call_tcp(request,"ADMIN_GET_LEGACY_RECIPE",{"recipe_id":recipe_id,**auth})
+    else:
+        revision_id=snapshot.get("revision_id")
+        if not revision_id:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","v2 snapshot has no revision identity"),status_code=422)
+        current_response=call_tcp(request,"ADMIN_GET_RECIPE",{"revision_id":revision_id,**auth})
+    current_envelope=_tcp_envelope(current_response)
+    if current_response.status_code>=400 or current_envelope.get("ok") is not True:return current_response
+    current=current_envelope.get("data") or {}
+    current_version=current.get("edit_version")
+    if current_version!=body.expected_version:
+        return JSONResponse(error_response(_request_id(request),"ADMIN_RECIPE_CONFLICT","recipe changed after the restore screen was opened; reload before restoring"),status_code=409)
+    fields=snapshot.get("fields") or {}
+    if kind=="legacy":
+        payload={"recipe_id":recipe_id,"title":fields.get("title"),"description":fields.get("description"),
+            "instructions":fields.get("instructions"),"minutes":fields.get("minutes"),"is_visible":fields.get("is_visible"),
+            "ingredients":fields.get("ingredients"),"expected_version":current_version,"admin_token":auth["admin_token"]}
+        return call_tcp(request,"ADMIN_UPDATE_LEGACY_RECIPE",payload)
+    payload={"recipe_id":recipe_id,"revision_id":snapshot["revision_id"],"title":fields.get("title"),
+        "description":fields.get("description"),"instructions":fields.get("instructions"),"minutes":fields.get("minutes"),
+        "role":fields.get("role"),"ingredients":fields.get("ingredients"),"expected_version":current_version,
+        "admin_token":auth["admin_token"]}
+    return call_tcp(request,"ADMIN_SAVE_RECIPE",payload)
 
 
 @app.patch("/api/admin/legacy-recipes/{recipe_id}/visibility")

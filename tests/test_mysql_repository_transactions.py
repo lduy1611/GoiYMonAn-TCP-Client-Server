@@ -519,12 +519,15 @@ def test_admin_legacy_recipe_edit_http_tcp_mysql_test_only(mysql_db, monkeypatch
             login = client.post("/api/admin/login", json={"username": "TEST_ONLY_ADMIN", "password": "TEST_ONLY_PASSWORD"})
             assert login.status_code == 200
             csrf = client.get("/api/admin/session").json()["data"]["csrf_token"]
+            current=client.get("/api/admin/legacy-recipes/1")
+            assert current.status_code==200
             body = {
                 "title": "TEST_ONLY legacy edit via gateway",
                 "description": "TEST_ONLY edit description",
                 "instructions": "TEST_ONLY changed cooking steps",
                 "minutes": 23,
                 "is_visible": True,
+                "expected_version":current.json()["data"]["edit_version"],
                 "ingredients": [{"ingredient_id": 2, "quantity": "TEST_ONLY 2 units", "is_required": True}],
             }
             response = client.patch("/api/admin/legacy-recipes/1", json=body, headers={"X-CSRF-Token": csrf})

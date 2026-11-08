@@ -376,9 +376,78 @@ def test_real_http_gateway_accepts_public_ids_and_expanded_role_catalog(released
             assert web.get(f'/recipes/{2**32}').status_code==422
 
 
+def test_meal_plan_gateway_preserves_unknown_quantities_and_excludes_deleted_recipes(released,monkeypatch,tmp_path):
+    """Real HTTP -> TCP -> private MySQL with unquantified and soft-deleted rows."""
+    from source.server.meal_plan_v2 import counts_for_people
+    from source.database.migrate_v2 import (run_admin_draft_migration,run_admin_recipe_catalog_migration,
+        run_legacy_recipe_overlay_migration)
+    connection,repo=released
+    assert sql(connection,'SELECT DATABASE() AS n')[0]['n'].startswith('goiy_v2_test_')
+    run_admin_draft_migration(connection,'apply')
+    run_legacy_recipe_overlay_migration(connection,'apply')
+    run_admin_recipe_catalog_migration(connection,'apply')
+    complete_test_legacy_catalog(connection)
+    recipe_id=int(sql(connection,'SELECT COALESCE(MAX(id),0)+1 AS id FROM v2_recipes')[0]['id'])
+    revision_id=int(sql(connection,'SELECT COALESCE(MAX(id),0)+1 AS id FROM v2_recipe_revisions')[0]['id'])
+    sql(connection,"INSERT INTO v2_recipes(id,origin_kind,author_ref) VALUES(%s,'curated_new','TEST_ONLY')",(recipe_id,))
+    sql(connection,"""INSERT INTO v2_recipe_revisions(id,recipe_id,revision_no,title,instructions,minutes,status)
+        VALUES(%s,%s,1,'TEST_ONLY optional no quantity','TEST_ONLY source text',10,'DRAFT')""",(revision_id,recipe_id))
+    sql(connection,"""INSERT INTO v2_recipe_ingredient_lines(revision_id,line_no,ingredient_id,quantity_raw,requirement)
+        VALUES(%s,1,72,NULL,'optional')""",(revision_id,))
+    sql(connection,"""INSERT INTO v2_admin_recipe_catalog_overrides
+        (v2_recipe_id,revision_id,role_code,direct_publication,updated_by)
+        VALUES(%s,%s,'main',1,'TEST_ONLY')""",(recipe_id,revision_id))
+    sql(connection,"""INSERT INTO v2_admin_recipe_catalog_overrides
+        (legacy_recipe_id,is_visible,is_deleted,updated_by) VALUES(1,1,1,'TEST_ONLY')""")
+    public_id=v2_public_id(recipe_id)
+    import source.server.main as server_main
+    monkeypatch.setattr(server_main,'LOG_PATH',tmp_path/'TEST_ONLY-meal-plan.jsonl')
+    with running_repository(repo) as (_,port):
+        monkeypatch.setenv('TCP_HOST','127.0.0.1');monkeypatch.setenv('TCP_PORT',str(port))
+        with TestClient(app) as web:
+            for people in (1,2,4,5,8):
+                counts=counts_for_people(people)
+                for ingredient_ids in ([],[1]):
+                    result=web.post('/api/meal-plan/v2',json={
+                        'people':people,'counts':counts,'ingredient_ids':ingredient_ids,
+                        'current_plan':{'main:1':public_id},'locked_slots':['main:1']})
+                    assert result.status_code==200,result.json()
+                    data=MealData.model_validate(result.json()['data'])
+                    assert data.people==people and data.counts.model_dump()==counts
+                    assert data.plan and len(data.plan.items)==sum(counts.values())
+                    ids=[item.recipe_id for item in data.plan.items]
+                    assert len(ids)==len(set(ids)) and public_id in ids and 1 not in ids
+                    null_uses=[use for item in data.plan.optional_shopping_list for use in item.uses
+                               if use.recipe_id==public_id]
+                    assert len(null_uses)==1 and null_uses[0].quantity is None
+            for ingredient_ids in ([],[1]):
+                result=web.post('/api/meal-plan',json={'ingredient_ids':ingredient_ids})
+                assert result.status_code==200,result.json()
+                data=result.json()['data']
+                assert data['algorithm']=='meal-plan-v1'
+                if data['plan']:
+                    ids=[item['recipe_id'] for item in data['plan']['items']]
+                    assert len(ids)==len(set(ids)) and 1 not in ids
+
+
 @pytest.mark.parametrize('width',[1280,390],ids=['desktop','mobile'])
 def test_published_v2_browser_after_50_legacy_ingredients(released,monkeypatch,tmp_path,width):
     connection,repo=released;complete_test_legacy_catalog(connection)
+    # A direct Admin publication changes the classification fingerprint while
+    # unreviewed diet metadata correctly keeps it out of the Chay candidate set.
+    from source.database.migrate_v2 import run_admin_draft_migration,run_admin_recipe_catalog_migration
+    run_admin_draft_migration(connection,'apply');run_admin_recipe_catalog_migration(connection,'apply')
+    recipe_id=int(sql(connection,'SELECT COALESCE(MAX(id),0)+1 AS id FROM v2_recipes')[0]['id'])
+    revision_id=int(sql(connection,'SELECT COALESCE(MAX(id),0)+1 AS id FROM v2_recipe_revisions')[0]['id'])
+    sql(connection,"INSERT INTO v2_recipes(id,origin_kind,author_ref) VALUES(%s,'curated_new','TEST_ONLY')",(recipe_id,))
+    sql(connection,"""INSERT INTO v2_recipe_revisions(id,recipe_id,revision_no,title,instructions,minutes,status)
+        VALUES(%s,%s,1,'TEST_ONLY direct Admin dish','TEST_ONLY instructions',10,'DRAFT')""",(revision_id,recipe_id))
+    sql(connection,"""INSERT INTO v2_recipe_ingredient_lines(revision_id,line_no,ingredient_id,quantity_raw,requirement)
+        VALUES(%s,1,71,'TEST_ONLY amount','required')""",(revision_id,))
+    sql(connection,"""INSERT INTO v2_admin_recipe_catalog_overrides
+        (v2_recipe_id,revision_id,role_code,direct_publication,updated_by)
+        VALUES(%s,%s,'main',1,'TEST_ONLY')""",(recipe_id,revision_id))
+    assert v2_public_id(recipe_id) in publication.load_catalog(connection).details
     node=shutil.which('node')
     browser=next((p for root in (os.getenv('PROGRAMFILES'),os.getenv('PROGRAMFILES(X86)')) if root
         for rel in ('Google/Chrome/Application/chrome.exe','Microsoft/Edge/Application/msedge.exe')
@@ -396,9 +465,17 @@ def test_published_v2_browser_after_50_legacy_ingredients(released,monkeypatch,t
                 if server.started:break
                 time.sleep(.05)
             assert server.started
+            with TestClient(app) as web:
+                generation=web.post('/api/meal-plan/v2',json={'people':4})
+                assert generation.status_code==200,generation.json()
+                generated=MealData.model_validate(generation.json()['data'])
+                assert ':admin:' in generated.classification_version
+                detail=web.get(f'/api/recipes/{v2_public_id(recipe_id)}')
+                assert detail.status_code==200 and detail.json()['data']['title']=='TEST_ONLY direct Admin dish'
             profile=tmp_path/'chrome';profile.mkdir()
-            result=subprocess.run([node,str(Path(__file__).with_name('browser_meal_plan_vegetarian.mjs')),str(browser),
-                f'http://127.0.0.1:{http_port}',str(profile),str(width),'published-v2'],
+            result=subprocess.run([node,str(Path(__file__).with_name('browser_meal_plan_admin_version.mjs')),str(browser),
+                f'http://127.0.0.1:{http_port}',str(profile),str(width)],
                 capture_output=True,text=True,encoding='utf-8',timeout=120)
+            if result.returncode==77:pytest.skip(result.stdout+result.stderr)
             assert result.returncode==0,result.stdout+result.stderr
         finally:server.should_exit=True;thread.join(timeout=5)

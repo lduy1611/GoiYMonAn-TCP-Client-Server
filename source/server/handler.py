@@ -293,7 +293,7 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
             return success_response(request_id, {"dataset_version": version, **result}), op
         if op in {"ADMIN_UPDATE_LEGACY_RECIPE","ADMIN_SET_LEGACY_RECIPE_VISIBILITY"}:
             from source.server import legacy_recipe_overlays
-            from source.server.repository import AdminSchemaUnavailable,AdminWriteUnavailable
+            from source.server.repository import AdminDraftConflict,AdminSchemaUnavailable,AdminWriteUnavailable
             try:
                 normalized=(legacy_recipe_overlays.validate_update(payload,request_id)
                     if op=="ADMIN_UPDATE_LEGACY_RECIPE" else legacy_recipe_overlays.validate_visibility(payload,request_id))
@@ -304,6 +304,8 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
                 raise ProtocolError("ADMIN_WRITE_UNAVAILABLE","dedicated Admin writer is not configured",request_id)
             except AdminSchemaUnavailable:
                 raise ProtocolError("ADMIN_SCHEMA_UNAVAILABLE","legacy recipe overlay migration and grants are required",request_id)
+            except AdminDraftConflict as exc:
+                raise ProtocolError("ADMIN_RECIPE_CONFLICT",str(exc),request_id)
             except ValueError:
                 raise ProtocolError("INVALID_PAYLOAD","legacy recipe or ingredient ID is invalid",request_id)
             except mysql.connector.Error as exc:

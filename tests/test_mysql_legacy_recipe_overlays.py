@@ -45,8 +45,12 @@ def test_overlay_edit_and_visibility_cover_admin_and_public_paths(mysql_db, monk
             assert response["data"]["items"] == []
 
     repo.admin_set_legacy_recipe_visibility({"recipe_id": 1, "is_visible": True}, "TEST_ONLY admin")
+    version_connection=repo.connect()
+    try:expected_version=repo.admin_get_legacy_recipe(version_connection,1)["edit_version"]
+    finally:version_connection.close()
     update = {"recipe_id": 1, "title": "TEST_ONLY overlay title", "description": "TEST_ONLY description",
         "instructions": "TEST_ONLY updated steps", "minutes": 25, "is_visible": True,
+        "expected_version":expected_version,
         "ingredients": [{"ingredient_id": 2, "quantity": "TEST_ONLY 2 units", "is_required": False}]}
     update=validate_update(update,REQUEST_ID)
     repo.admin_update_legacy_recipe(update, "TEST_ONLY admin")
@@ -67,9 +71,9 @@ def test_invalid_legacy_overlay_is_rejected_without_writes(mysql_db, monkeypatch
     repo = MySQLRepository(config, pool_size=1)
     monkeypatch.setattr(repo, "_admin_writer", lambda: mysql.connector.connect(**config))
     payload = {"recipe_id": 1, "title": "TEST_ONLY invalid", "description": "", "instructions": "TEST_ONLY steps",
-        "minutes": 10, "is_visible": True,
+        "minutes": 10, "is_visible": True,"expected_version":"0"*64,
         "ingredients": [{"ingredient_id": 999, "quantity": "TEST_ONLY", "is_required": True}]}
-    with pytest.raises(ValueError, match="ingredient IDs"):
+    with pytest.raises(ValueError, match="shared catalog"):
         repo.admin_update_legacy_recipe(payload, "TEST_ONLY admin")
     assert sql(connection, "SELECT COUNT(*) AS n FROM v2_admin_legacy_recipe_overrides")[0]["n"] == 0
 

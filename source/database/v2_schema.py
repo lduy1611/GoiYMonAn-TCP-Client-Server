@@ -32,6 +32,7 @@ def history_is_compatible(rows):
     from source.database import v2_legacy_ingredient_admin_schema
     from source.database import v2_recipe_image_schema
     from source.database import v2_admin_recipe_catalog_schema
+    from source.database import v2_legacy_recipe_catalog_ingredient_schema
     by_version = {row["version"]:row for row in rows}
     supported = {VERSION, v2_context_schema.VERSION, v2_admin_schema.VERSION,
                  v2_ingredient_admin_schema.VERSION, v2_user_account_schema.VERSION}
@@ -39,6 +40,7 @@ def history_is_compatible(rows):
     supported.add(v2_legacy_ingredient_admin_schema.VERSION)
     supported.add(v2_recipe_image_schema.VERSION)
     supported.add(v2_admin_recipe_catalog_schema.VERSION)
+    supported.add(v2_legacy_recipe_catalog_ingredient_schema.VERSION)
     if VERSION not in by_version or set(by_version) - supported:
         return False
     base = by_version[VERSION]
@@ -73,5 +75,12 @@ def history_is_compatible(rows):
     catalog = by_version.get(v2_admin_recipe_catalog_schema.VERSION)
     if catalog is not None and not (catalog["checksum"] == v2_admin_recipe_catalog_schema.checksum()
             and catalog["execution_result"] == "APPLIED" and catalog["applied_at"] is not None):
+        return False
+    shared_legacy_ingredients = by_version.get(v2_legacy_recipe_catalog_ingredient_schema.VERSION)
+    if shared_legacy_ingredients is not None and not (
+        shared_legacy_ingredients["checksum"] == v2_legacy_recipe_catalog_ingredient_schema.checksum()
+        and shared_legacy_ingredients["execution_result"] == "APPLIED"
+        and shared_legacy_ingredients["applied_at"] is not None
+    ):
         return False
     return True

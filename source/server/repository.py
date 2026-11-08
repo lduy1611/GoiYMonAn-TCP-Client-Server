@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import threading
 import unicodedata
@@ -1530,6 +1531,10 @@ class MySQLRepository:
         from source.server.legacy_ingredient_overlays import display_name,read_overrides
         for iid,overlay in read_overrides(connection).items():
             if iid in names:names[iid]=display_name(names[iid],overlay)
+        from source.server.legacy_recipe_overlays import read_overlays
+        for overlay in read_overlays(connection).values():
+            for item in overlay["ingredients"]:
+                names[int(item["id"])]=item["name"]
         return [{**recipe, "ingredient_names": [names[i] for i in sorted(recipe["all_ids"])]}
                 for recipe in recipes]
 
@@ -1608,7 +1613,8 @@ class MySQLRepository:
                 "recipe_catalog_ready":recipe_catalog_ready,
                 "review_write_ready":self.admin_review_writer_ready(),
                 "ingredient_admin_ready":self.admin_ingredient_writer_ready(),
-                "legacy_recipe_overlay_ready":self.admin_legacy_recipe_overlay_ready(connection)}
+                "legacy_recipe_overlay_ready":self.admin_legacy_recipe_overlay_ready(connection),
+                "legacy_recipe_shared_ingredient_ready":self.legacy_recipe_shared_ingredient_ready(connection)}
 
     def admin_legacy_recipe_overlay_ready(self,connection):
         try:
@@ -1637,6 +1643,42 @@ class MySQLRepository:
             finally:writer.close()
         except Exception:
             return False
+
+    def legacy_recipe_shared_ingredient_ready(self,connection=None):
+        reader=connection
+        writer=None
+        try:
+            from source.database import v2_legacy_recipe_catalog_ingredient_schema as schema
+            if reader is None:
+                reader=self._pool.get_connection()
+            marker=self._fetchone(reader,"SELECT checksum,schema_hash,execution_result FROM v2_migration_history WHERE version=%s",
+                                  (schema.VERSION,))
+            if (not marker or marker[0]!=schema.checksum() or marker[2]!="APPLIED"
+                    or not schema.schema_ready(reader) or not schema.schema_hash_matches(reader,marker[1])):
+                return False
+            writer=self._admin_writer()
+            grants=[str(row[0]).casefold().replace("`","") for row in self._fetchall(writer,"SHOW GRANTS FOR CURRENT_USER()")]
+            database=str(self.config["database"]).casefold()
+            required={"v2_admin_legacy_recipe_override_ingredients":{"select","insert","update","delete"},
+                      "v2_ingredients":{"select"}}
+            for table,privileges in required.items():
+                scope=f"{database}.{table}"
+                available=set()
+                for grant in grants:
+                    match=re.search(r"grant (.*?) on ",grant)
+                    if not match:continue
+                    grant_scope=grant.split(" on ",1)[1].split(" to ",1)[0].strip()
+                    if grant_scope not in {scope, f"{database}.*", "*.*"}:continue
+                    tokens={item.strip().split("(",1)[0] for item in match.group(1).split(",")}
+                    if "all privileges" in tokens:available|=privileges
+                    else:available|=tokens
+                if not privileges<=available:return False
+            return True
+        except Exception:
+            return False
+        finally:
+            if writer is not None:writer.close()
+            if connection is None and reader is not None:reader.close()
 
     def admin_draft_writer_ready(self):
         try:

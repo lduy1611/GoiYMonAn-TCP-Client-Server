@@ -15,7 +15,9 @@ RecipeIDs = Annotated[list[RecipeID], Field(max_length=50)]
 
 class ShoppingUse(Contract):
     recipe_id: RecipeID
-    quantity: StrictStr = Field(max_length=255)
+    # Admin-authored/public recipe lines may intentionally have no verified
+    # quantity yet. Preserve null through the gateway; never invent an amount.
+    quantity: StrictStr | None = Field(max_length=255)
     is_required: bool
 
 Slot = Annotated[StrictStr, Field(pattern=r"^(main|vegetable|soup):[12]$")]

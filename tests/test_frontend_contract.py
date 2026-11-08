@@ -37,6 +37,18 @@ def test_home_controls_are_labeled_and_script_targets_exist():
     assert targets - {"retry-ingredients"} <= set(home.ids)
 
 
+def test_meal_plan_v2_keeps_unquantified_items_without_fabricating_amounts():
+    script=(ROOT/"source/web/static/meal-plan-v2.js").read_text(encoding="utf-8")
+    template=(ROOT/"source/web/templates/meal_plan_v2.html").read_text(encoding="utf-8")
+    assert "u.quantity===null||typeof u.quantity==='string'" in script
+    assert "u.quantity||'" in script
+    assert "validClassificationVersion(d?.classification_version,baseVersion)" in script
+    assert "^:v2:[a-f0-9]{16}:admin:[a-f0-9]{12}$" in script
+    assert "^::admin:[a-f0-9]{12}$" in script
+    assert "Mã yêu cầu: '+e.request_id" in script
+    assert "meal-plan-v2.js?v=meal-classification-admin-1" in template
+
+
 def test_pages_expose_loading_errors_and_keyboard_navigation():
     home, detail = page("index.html"), page("detail.html")
     assert any(attrs.get("role") == "alert" for _, attrs in home.elements)

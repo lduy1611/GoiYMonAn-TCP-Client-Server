@@ -104,6 +104,7 @@ try {
   const checkMeal=async size=>{
     await settled();const ids=await recipeIDs();assert.equal(ids.length,size);assert.ok(ids.every(id=>allowed.has(id)));
     const s=await snapshot();assert.equal(s.conditions.preferences.diet,'vegetarian');
+    if(published)assert.ok(s.view.data.classification_version.includes(':admin:'),'Response includes direct Admin catalog fingerprint');
     assert.ok(!s.view.data.plan.required_ids.some(id=>[1,4,13,14,24,26,28,29,35,36,37,38,39].includes(id)));
   };
   await navigate('/meal-plan');await ready();await wait('!document.getElementById("meal-pref-diet").disabled');

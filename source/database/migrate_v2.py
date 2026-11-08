@@ -22,6 +22,7 @@ from source.database import v2_legacy_recipe_overlay_schema
 from source.database import v2_recipe_image_schema
 from source.database import v2_legacy_ingredient_admin_schema
 from source.database import v2_admin_recipe_catalog_schema
+from source.database import v2_legacy_recipe_catalog_ingredient_schema
 
 HISTORY = "v2_migration_history"
 HISTORY_DDL = """CREATE TABLE v2_migration_history (
@@ -130,7 +131,8 @@ def check(connection):
                        v2_admin_schema.VERSION, v2_ingredient_admin_schema.VERSION,
                        v2_user_account_schema.VERSION, v2_legacy_recipe_overlay_schema.VERSION,
                        v2_recipe_image_schema.VERSION, v2_legacy_ingredient_admin_schema.VERSION,
-                       v2_admin_recipe_catalog_schema.VERSION}:
+                       v2_admin_recipe_catalog_schema.VERSION,
+                       v2_legacy_recipe_catalog_ingredient_schema.VERSION}:
         raise MigrationError("Unknown migration history; refusing to overwrite")
     if v2_schema.VERSION not in history:
         raise MigrationError("Context migration exists without the base portion migration")
@@ -183,11 +185,23 @@ def check(connection):
     elif existing & user_account_owned:
         raise MigrationError("User account table exists without its migration marker")
     legacy_overlay_state="NOT_APPLIED"
+    shared_legacy_ingredients_state="NOT_APPLIED"
+    if v2_legacy_recipe_catalog_ingredient_schema.VERSION in history:
+        shared_checksum,shared_hash,shared_result=history[v2_legacy_recipe_catalog_ingredient_schema.VERSION]
+        if (shared_checksum!=v2_legacy_recipe_catalog_ingredient_schema.checksum()
+                or shared_result!="APPLIED"
+                or not v2_legacy_recipe_catalog_ingredient_schema.schema_ready(connection)
+                or not v2_legacy_recipe_catalog_ingredient_schema.schema_hash_matches(connection,shared_hash)):
+            raise MigrationError("Shared legacy recipe ingredient migration is partial or schema drifted")
+        shared_legacy_ingredients_state="APPLIED"
+    elif v2_legacy_recipe_catalog_ingredient_schema.schema_ready(connection):
+        raise MigrationError("Shared legacy recipe ingredient columns exist without their migration marker")
     if v2_legacy_recipe_overlay_schema.VERSION in history:
         overlay_checksum,overlay_hash,overlay_result=history[v2_legacy_recipe_overlay_schema.VERSION]
+        base_valid=(v2_legacy_recipe_overlay_schema.schema_hash_matches(connection,overlay_hash)
+                    or shared_legacy_ingredients_state=="APPLIED")
         if (overlay_checksum!=v2_legacy_recipe_overlay_schema.checksum() or overlay_result!="APPLIED"
-                or not legacy_overlay_owned<=existing
-                or not v2_legacy_recipe_overlay_schema.schema_hash_matches(connection,overlay_hash)):
+                or not legacy_overlay_owned<=existing or not base_valid):
             raise MigrationError("Legacy recipe overlay migration is partial or schema drifted")
         legacy_overlay_state="APPLIED"
     elif existing & legacy_overlay_owned:
@@ -249,6 +263,8 @@ def check(connection):
             "user_account_state": user_account_state,
             "legacy_recipe_overlay_version":v2_legacy_recipe_overlay_schema.VERSION,
             "legacy_recipe_overlay_state":legacy_overlay_state,
+            "legacy_recipe_catalog_ingredient_version":v2_legacy_recipe_catalog_ingredient_schema.VERSION,
+            "legacy_recipe_catalog_ingredient_state":shared_legacy_ingredients_state,
             "recipe_image_version":v2_recipe_image_schema.VERSION,
             "recipe_image_state":recipe_image_state,
             "legacy_ingredient_admin_version":v2_legacy_ingredient_admin_schema.VERSION,
@@ -489,6 +505,44 @@ def run_legacy_ingredient_admin_migration(connection, action="check"):
         connection.autocommit = original_autocommit
 
 
+def run_legacy_recipe_catalog_ingredient_migration(connection, action="check"):
+    """Apply only migration 010; it extends overlay lines without touching legacy rows."""
+    if action not in {"check", "apply"}:
+        raise ValueError("invalid shared legacy recipe ingredient migration action")
+    if connection.in_transaction:
+        raise MigrationError("A dedicated idle migration connection is required")
+    original_autocommit=connection.autocommit
+    connection.autocommit=True
+    database=_rows(connection,"SELECT DATABASE()")[0][0]
+    lock="portion-v2-"+sha256(str(database).encode()).hexdigest()[:40]
+    locked=False
+    try:
+        locked=_rows(connection,"SELECT GET_LOCK(%s,5)",(lock,))[0][0]==1
+        if not locked:raise MigrationError("Another migration holds the database lock")
+        outcome=check(connection)
+        if outcome["state"]!="APPLIED" or outcome["legacy_recipe_overlay_state"]!="APPLIED":
+            raise MigrationError("Migrations 001 and 006 must be APPLIED before migration 010")
+        if action=="check" or outcome["legacy_recipe_catalog_ingredient_state"]=="APPLIED":
+            return {**outcome,"changed":False}
+        _rows(connection,f"INSERT INTO {HISTORY}(version,checksum,execution_result) VALUES(%s,%s,'APPLYING')",
+              (v2_legacy_recipe_catalog_ingredient_schema.VERSION,v2_legacy_recipe_catalog_ingredient_schema.checksum()))
+        try:
+            for statement in v2_legacy_recipe_catalog_ingredient_schema.statements():_rows(connection,statement)
+            if not v2_legacy_recipe_catalog_ingredient_schema.schema_ready(connection):
+                raise MigrationError("Migration 010 did not create the expected shared ingredient constraints")
+            schema_hash=v2_legacy_recipe_catalog_ingredient_schema.schema_hash(connection)
+            _rows(connection,f"UPDATE {HISTORY} SET execution_result='APPLIED',schema_hash=%s,applied_at=UTC_TIMESTAMP(6) WHERE version=%s",
+                  (schema_hash,v2_legacy_recipe_catalog_ingredient_schema.VERSION))
+        except Exception:
+            _rows(connection,f"UPDATE {HISTORY} SET execution_result='FAILED' WHERE version=%s",
+                  (v2_legacy_recipe_catalog_ingredient_schema.VERSION,))
+            raise
+        return {**check(connection),"changed":True}
+    finally:
+        if locked:_rows(connection,"SELECT RELEASE_LOCK(%s)",(lock,))
+        connection.autocommit=original_autocommit
+
+
 def run_admin_recipe_catalog_migration(connection, action="check"):
     """Apply only additive migration 009 for direct Admin publication/state."""
     if action not in {"check", "apply"}:
@@ -589,7 +643,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", required=True, help="Explicit target; no default application DB")
     parser.add_argument("--action", choices=["check", "apply", "disable"], default="check")
-    parser.add_argument("--migration", choices=["core", "admin-draft-description", "admin-ingredient-state", "user-accounts", "legacy-recipe-overlays", "recipe-images", "legacy-ingredient-overrides", "admin-recipe-catalog"], default="core")
+    parser.add_argument("--migration", choices=["core", "admin-draft-description", "admin-ingredient-state", "user-accounts", "legacy-recipe-overlays", "recipe-images", "legacy-ingredient-overrides", "admin-recipe-catalog", "legacy-recipe-catalog-ingredients"], default="core")
     args = parser.parse_args()
     from source.server.repository import mysql_config_from_env
     config = mysql_config_from_env()
@@ -628,6 +682,10 @@ def main():
             if args.action == "disable":
                 parser.error("--action disable is not valid for migration 009")
             print(json.dumps(run_admin_recipe_catalog_migration(connection,args.action)))
+        elif args.migration == "legacy-recipe-catalog-ingredients":
+            if args.action == "disable":
+                parser.error("--action disable is not valid for additive migration 010")
+            print(json.dumps(run_legacy_recipe_catalog_ingredient_migration(connection,args.action)))
         else:
             print(json.dumps(run(connection, args.action)))
     finally:

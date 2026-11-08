@@ -192,7 +192,8 @@ def test_admin_legacy_recipe_gateway_requires_session_csrf_and_valid_payload(mon
         calls.append((op,payload)) or {"version":1,"request_id":request_id,"ok":True,
         "data":{"recipe_id":1,"status":"SAVED"},"error":None})
     body={"title":"TEST_ONLY overlay","description":"TEST_ONLY description","instructions":"TEST_ONLY steps",
-        "minutes":20,"is_visible":True,"ingredients":[{"ingredient_id":1,"quantity":"TEST_ONLY 1","is_required":True}]}
+        "minutes":20,"is_visible":True,"expected_version":"a"*64,
+        "ingredients":[{"ingredient_id":1,"quantity":"TEST_ONLY 1","is_required":True}]}
     with TestClient(app) as client:
         assert client.patch("/api/admin/legacy-recipes/1",json=body).status_code==401
         client.post("/api/admin/login",json={"username":"TEST_ONLY_ADMIN","password":"TEST_ONLY_PASSWORD"})

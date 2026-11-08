@@ -117,7 +117,7 @@ def test_invalid_payloads_rejected_on_tcp_and_http(meal_web, payload):
 
 def test_gateway_transport_and_tcp_legacy_compatibility(meal_web, monkeypatch):
     web, _ = meal_web
-    assert 'meal-plan-v2.js?v=meal-vegetarian-1' in web.get('/meal-plan').text
+    assert 'meal-plan-v2.js?v=meal-classification-admin-1' in web.get('/meal-plan').text
     assert 'meal-plan.js?v=meal-web-3' in web.get('/meal-plan/v1').text
     seen, original = [], TCPClient.request
     def spy(client, op, payload, request_id=None):

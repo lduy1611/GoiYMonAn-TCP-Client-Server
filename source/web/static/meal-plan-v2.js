@@ -44,11 +44,21 @@
     }
     return names;
   }
+  function validClassificationVersion(version,base) {
+    if (version===base) return true;
+    if (typeof version!=='string'||typeof base!=='string'||!version.startsWith(base)) return false;
+    const suffix=version.slice(base.length);
+    // The server fingerprints both the approved v2 release and direct Admin
+    // catalog overlays. With no active v2 release the current server format
+    // contains a double separator before :admin; accept that exact legacy form
+    // as well so saved plans and current responses remain readable.
+    return [/^:v2:[a-f0-9]{16}$/,/^:v2:[a-f0-9]{16}:admin:[a-f0-9]{12}$/,
+      /^:admin:[a-f0-9]{12}$/,/^::admin:[a-f0-9]{12}$/].some(pattern=>pattern.test(suffix));
+  }
   function validData(d,c) {
     const names=planNames(d), dataIDs=a=>ids(a,50,names);
     const baseVersion=document.body.dataset.classificationVersion;
-    const versionOK=d?.classification_version===baseVersion ||
-      typeof d?.classification_version==='string'&&d.classification_version.startsWith(baseVersion+':v2:')&&/^[a-f0-9]{16}$/.test(d.classification_version.slice((baseVersion+':v2:').length));
+    const versionOK=validClassificationVersion(d?.classification_version,baseVersion);
     if (d?.people!==undefined&&(!integer(d.people,1,12)||!sameCounts(d.counts,countsForPeople(d.people))))return false;
     if (c.preferences&&(!validPreferences(d?.preferences)||Object.keys(c.preferences).length!==Object.keys(d.preferences).length||
         !Object.entries(c.preferences).every(([k,v])=>d.preferences[k]===v)||!text(d.metadata_version))) return false;
@@ -77,7 +87,7 @@
     const shopping=(list,required)=>Array.isArray(list)&&list.length<=50&&unique(list.map(i=>i?.ingredient_id))&&list.every(i=>
       names.get(i.ingredient_id)===i.name&&!c.ingredient_ids.includes(i.ingredient_id)&&!c.excluded_ids.includes(i.ingredient_id)&&
       Array.isArray(i.uses)&&i.uses.length>=1&&i.uses.length<=6&&unique(i.uses.map(u=>u?.recipe_id))&&
-      i.uses.every(u=>recipeID(u.recipe_id)&&recipeIDs.includes(u.recipe_id)&&typeof u.quantity==='string'&&u.quantity.length<=255&&typeof u.is_required==='boolean')&&
+      i.uses.every(u=>recipeID(u.recipe_id)&&recipeIDs.includes(u.recipe_id)&&(u.quantity===null||typeof u.quantity==='string'&&u.quantity.length<=255)&&typeof u.is_required==='boolean')&&
       i.uses.some(u=>u.is_required)===required);
     return shopping(p.shopping_list,true)&&shopping(p.optional_shopping_list,false)&&
       same(p.shopping_list.map(i=>i.ingredient_id),p.missing_ids)&&same(p.optional_shopping_list.map(i=>i.ingredient_id),p.optional_missing_ids)&&
@@ -397,7 +407,10 @@
       if (token!==state.sequence||sig!==signature(conditions())) return;
       if (!response.ok||!e.ok) throw Error(e.error?.code==='UNKNOWN_OPERATION'?'TCP Server chưa hỗ trợ mâm linh hoạt. Hãy khởi động server mới hoặc mở bản ba món cũ.':e.error?.code==='TIMEOUT'?'TCP Server phản hồi quá lâu. Hãy thử lại.':e.error?.message||'Không thể tạo mâm.');
       const data=e.data;
-      if (e.version!==1||!text(e.request_id,80)||data?.people!==payload.people||!validData(data,c)) throw Error('Phản hồi không hợp lệ hoặc dữ liệu đã đổi; mâm và ghim hiện tại được giữ lại.');
+      if (e.version!==1||!text(e.request_id,80)||data?.people!==payload.people||!validData(data,c)) {
+        const requestRef=text(e.request_id,80)?' Mã yêu cầu: '+e.request_id+'.':'';
+        throw Error('Phản hồi không hợp lệ hoặc dữ liệu đã đổi; mâm và ghim hiện tại được giữ lại.'+requestRef);
+      }
       if (data.plan) {
         const next=Object.fromEntries(data.plan.items.map(i=>[i.slot,i.recipe_id]));
         const actual=Object.keys({...current,...next}).filter(k=>current[k]!==next[k]);
