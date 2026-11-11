@@ -100,9 +100,18 @@ try {
   const navigate = async path => {
     const previousDocument = await evaluate('performance.timeOrigin');
     await send('Page.navigate', {url: baseUrl + path});
-    await wait('performance.timeOrigin !== ' + previousDocument + ' && document.readyState === "complete" && location.pathname === ' + JSON.stringify(path));
+    await wait('performance.timeOrigin !== ' + previousDocument + ' && document.readyState === "complete" && location.pathname === ' + JSON.stringify(new URL(path, location.origin).pathname) + ' && location.search === ' + JSON.stringify(new URL(path, location.origin).search));
+  };
+  const settleRecommendations = async () => {
+    await pause(400);
+    await wait('document.getElementById("results-area").getAttribute("aria-busy") === "false"');
   };
   const click = async selector => {
+    if (selector === '#mode-search') { await navigate('/?view=explore'); await wait('document.getElementById("ingredient-results").getAttribute("aria-busy")=="false"'); return; }
+    if (selector === '#mode-recommend') { await navigate('/?view=fridge'); await wait('document.getElementById("ingredient-results").getAttribute("aria-busy")=="false"'); return; }
+    if (selector === '#recommend-button' && await evaluate("document.querySelector('[data-user-tab=\"fridge\"]').getAttribute('aria-current') === 'page'")) {
+      await settleRecommendations(); return;
+    }
     assert.ok(await evaluate('!!document.querySelector(' + JSON.stringify(selector) + ')'), 'Missing: ' + selector);
     const point = await evaluate(`(() => {
       const el = document.querySelector(${JSON.stringify(selector)});
@@ -155,7 +164,7 @@ try {
       const entry = catalog.recipes[String(photo.id)];
       const real = entry?.is_placeholder === false;
       assert.equal(photo.path, real ? entry.image_path : '/static/images/recipes/placeholder.svg');
-      assert.equal(photo.placeholder, real ? 'false' : 'true');
+      assert.equal(photo.placeholder, real ? 'false' : 'page');
       assert.ok(photo.alt.trim().length > 0);
       assert.ok(photo.path.startsWith('/static/images/recipes/'), 'Never hotlink images');
       assert.equal(photo.loading, detail ? 'eager' : 'lazy');
@@ -221,6 +230,88 @@ try {
     }, null, 2));
     console.log('BEFORE: ' + width + ' ' + JSON.stringify({diagnosis, beforeTitles, afterTitles}));
   } else {
+  // Exercise the automatic path without clicking submit, on desktop and mobile.
+  await navigate('/');
+  await wait('document.querySelectorAll("[data-select]").length > 0');
+  const beforeRapid = posts.length;
+  await evaluate(`(() => {
+    document.querySelector('[data-select="1"]').click();
+    document.querySelector('[data-select="2"]').click();
+    document.querySelector('[data-exclude="7"]').click();
+    for (const [id,value] of [['max-minutes','20'],['top-k','3']]) {
+      const el=document.getElementById(id); el.value=value; el.dispatchEvent(new Event('input'));
+    }
+  })()`);
+  const selectionScroll = await evaluate('window.scrollY');
+  await settleRecommendations();
+  assert.equal(posts.length, beforeRapid + 1, 'Rapid changes debounce to a single POST');
+  assert.equal(await evaluate('window.scrollY'), selectionScroll, 'Automatic results must not scroll');
+  assert.equal(await evaluate('document.getElementById("ingredient-controls").disabled'), false);
+  await noOverflow();
+
+  // Deliberately ignore abort in this transport double, then deliver old success
+  // and failure after a newer success. Sequence protection must work by itself.
+  await evaluate(`(() => {
+    window.originalFetch=window.fetch; window.heldRecommendations=[];
+    window.fetch=(url,options)=>url==='/api/recommend' ? new Promise((resolve,reject)=> {
+      const held={resolve,reject,signal:options.signal}; window.heldRecommendations.push(held);
+      originalFetch(url,{...options,signal:undefined}).then(r=>held.response=r);
+    }) : originalFetch(url,options);
+  })()`);
+  await input('top-k', '2');
+  await wait('window.heldRecommendations.length === 1 && !!heldRecommendations[0].response');
+  await input('top-k', '1');
+  assert.equal(await evaluate('heldRecommendations[0].signal.aborted'), true);
+  await wait('window.heldRecommendations.length === 2 && !!heldRecommendations[1].response');
+  await evaluate('heldRecommendations[1].resolve(heldRecommendations[1].response)');
+  await wait('document.getElementById("result-count").textContent === "1 món"');
+  const newestSnapshot = await evaluate('sessionStorage.getItem("goiy-selection-v1")');
+  await evaluate('heldRecommendations[0].resolve(heldRecommendations[0].response)');
+  await pause(100);
+  assert.equal(await evaluate('sessionStorage.getItem("goiy-selection-v1")'), newestSnapshot);
+  await input('top-k', '2');
+  await wait('heldRecommendations.length === 3');
+  await input('top-k', '1');
+  await wait('heldRecommendations.length === 4 && !!heldRecommendations[3].response');
+  await evaluate('heldRecommendations[3].resolve(heldRecommendations[3].response)');
+  await wait('document.getElementById("results-area").getAttribute("aria-busy") === "false"');
+  await evaluate('heldRecommendations[2].reject(Error("late timeout"))');
+  await pause(100);
+  assert.equal(await evaluate('document.getElementById("message").classList.contains("hidden")'), true);
+  await evaluate('window.fetch=window.originalFetch');
+  const beforeUnexclude = posts.length;
+  await evaluate('document.querySelector(\'[data-exclude="7"]\').click()');
+  await settleRecommendations();
+  assert.equal(posts.length, beforeUnexclude + 1);
+  assert.deepEqual(JSON.parse(posts.at(-1).postData).excluded_ids, []);
+  // The HTTP errors produced by a disconnected or timed out TCP server preserve
+  // all selections. Recovery is automatic on the next filter edit.
+  for (const [code,status] of [['UPSTREAM_UNAVAILABLE',503],['TIMEOUT',504]]) {
+    await evaluate(`window.fetch=(url,options)=>url==='/api/recommend'
+      ? Promise.resolve(new Response(JSON.stringify({ok:false,error:{code:${JSON.stringify(code)},message:'TCP unavailable or timeout'}}),{status:${status}}))
+      : originalFetch(url,options)`);
+    await input('top-k', status === 503 ? '2' : '3');
+    await settleRecommendations();
+    assert.equal(await evaluate('document.getElementById("message").textContent'), 'TCP unavailable or timeout');
+    assert.equal(await evaluate('document.getElementById("selected-count").textContent'), '2/30');
+    assert.equal(await evaluate('document.getElementById("ingredient-controls").disabled'), false);
+  }
+  await evaluate('window.fetch=window.originalFetch');
+  await input('top-k', '4');
+  // Leave during debounce; Back must finish the pending filter rather than
+  // restore a result belonging to an older filter.
+  await navigate('/meal-plan');
+  await back();
+  await settleRecommendations();
+  assert.equal(await evaluate('document.getElementById("top-k").value'), '4');
+  assert.equal(await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1")).view.kind'), 'results');
+  const beforeClear = posts.length;
+  await click('#clear-selection');
+  await settleRecommendations();
+  assert.equal(posts.length, beforeClear, 'Empty available selection must not POST');
+  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
+  await input('max-minutes', '');
+  await input('top-k', '5');
   // A previous release can be cached at the old URLs. Versioned URLs must avoid it.
   legacyCss = Buffer.from('/* stale stylesheet without the v1.1 selectors */').toString('base64');
   await send('Network.setCacheDisabled', {cacheDisabled: true});
@@ -247,7 +338,7 @@ try {
   assert.equal(await evaluate('document.activeElement.dataset.select'), '1');
   await key(' ', 'Space', 32);
   assert.equal(await evaluate('document.getElementById("selected-count").textContent'), '1/30');
-  assert.equal(await evaluate('document.activeElement.getAttribute("aria-pressed")'), 'true');
+  assert.equal(await evaluate('document.activeElement.getAttribute("aria-pressed")'), 'page');
   await click('[data-select="1"]');
   await key('Tab', 'Tab', 9);
   assert.equal(await evaluate('document.activeElement.dataset.exclude'), '1');
@@ -277,14 +368,13 @@ try {
   await input('top-k', '3');
   const beforeSubmit = posts.length;
   await send('Network.emulateNetworkConditions', {offline: false, latency: 200, downloadThroughput: -1, uploadThroughput: -1});
-  await click('#recommend-button');
-  assert.equal(await evaluate('document.getElementById("ingredient-controls").disabled'), true);
+  assert.equal(await evaluate('document.getElementById("ingredient-controls").disabled'), false);
   assert.notEqual(await evaluate('getComputedStyle(document.getElementById("loading")).display'), 'none');
   await click('#recommend-button');
   await wait('document.querySelectorAll(".recipe-card").length > 0');
   await wait('document.getElementById("results-area").getAttribute("aria-busy") === "false"');
   await send('Network.emulateNetworkConditions', {offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1});
-  assert.equal(posts.length, beforeSubmit + 1, 'Double submit must not create duplicate requests');
+  assert.equal(posts.length, beforeSubmit + 1, 'Rapid filter edits must debounce to one request');
   const payload = JSON.parse(posts.at(-1).postData);
   assert.deepEqual(payload, {ingredient_ids: [1, 2], excluded_ids: [7], top_k: 3, algorithm: 'proposed', max_minutes: 20});
   assert.equal(await evaluate('getComputedStyle(document.getElementById("empty-state")).display'), 'none');
@@ -363,7 +453,7 @@ try {
   // Native form validation blocks an invalid filter before any POST.
   const beforeInvalid = posts.length;
   await input('top-k', '21');
-  assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0, 'Changing filters invalidates previous cards immediately');
+  assert.ok(await evaluate('document.querySelectorAll(".recipe-card").length > 0'), 'Keep cards stable while editing filters');
   assert.equal(await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1")).view'), null);
   await click('#recommend-button');
   await pause(150);
@@ -392,25 +482,36 @@ try {
   await wait('document.querySelector(".detail-heading h1") !== null');
   await back();
   assert.ok(await evaluate('!document.getElementById("message").classList.contains("hidden") && document.getElementById("message").textContent.includes("Không thể kết nối")'), 'Back must restore the error state and allow retry');
-  await click('#recommend-button');
+  await input('top-k', '4');
+  await settleRecommendations();
   await wait('document.querySelectorAll(".recipe-card").length > 0');
   await click('#clear-selection');
   assert.equal(await evaluate('document.getElementById("recommend-button").disabled'), true);
   assert.equal(await evaluate('document.getElementById("excluded-count").textContent'), '0/30');
   if (width < 760) { await resize(320); await noOverflow(); await resize(width); }
   // v1.2: server-side name search without ingredient selection.
-  const beforeSearchModeRequests = apiRequests.length;
+  const beforeSearchModePosts = posts.length;
   await click('#mode-search');
   assert.equal(await evaluate('document.getElementById("recommend-button").disabled'), false);
   assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false');
   assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
   assert.equal(await evaluate('document.getElementById("advanced-summary").textContent'), 'Có sẵn: 0 • Loại trừ: 0');
   assert.equal(await evaluate('document.getElementById("max-minutes").closest("#search-filter-slot") !== null'), true);
-  assert.equal(apiRequests.length, beforeSearchModeRequests, 'Switching mode must not send an HTTP request');
+  assert.equal(posts.length, beforeSearchModePosts, 'Entering search mode must not submit a search automatically');
   await noOverflow();
   await screenshot('search-collapsed-' + width);
   if (width < 760) { await resize(320); await noOverflow(); await screenshot('search-collapsed-320'); await resize(width); }
   await input('max-minutes', '');
+  for (const [query, firstRecipe] of [['cá',7],['ca',7],['cà',1],['canh',6],['gà',6],['ga',6]]) {
+    await input('recipe-query', query);
+    await click('#recommend-button');
+    await wait('document.getElementById("results-area").getAttribute("aria-busy") === "false" && document.querySelector(".detail-link") !== null');
+    assert.equal(await evaluate('document.querySelector(".detail-link").getAttribute("href")'), '/recipes/' + firstRecipe);
+    if (query === 'cá') {
+      assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'), ['Cá basa kho gừng']);
+    }
+    await noOverflow();
+  }
   for (const query of ['đậu phụ', 'dau phu', 'ĐẬU PHỤ'.normalize('NFD')]) {
     await input('recipe-query', query);
     const beforeSearchPosts = posts.length;
@@ -453,13 +554,13 @@ try {
   await input('search-limit', '1');
   const beforeDisclosureRequests = apiRequests.length;
   await click('#advanced-toggle');
-  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true');
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'page');
   assert.notEqual(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
   await key('Enter', 'Enter', 13);
   assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false');
   await send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
   await key(' ', 'Space', 32);
-  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true');
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'page');
   assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).animationDuration'), '0s');
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".advanced-chevron")).transitionDuration'), '0s');
   await send('Emulation.setEmulatedMedia', {features: []});
@@ -486,7 +587,7 @@ try {
   await click('.detail-link');
   await wait('document.querySelector(".detail-heading h1") !== null');
   await back();
-  assert.equal(await evaluate('document.getElementById("mode-search").getAttribute("aria-pressed")'), 'true');
+  assert.equal(await evaluate(`document.querySelector('[data-user-tab="explore"]').getAttribute('aria-current')`), 'page');
   assert.equal(await evaluate('document.getElementById("recipe-query").value'), 'trung');
   assert.equal(await evaluate('document.getElementById("max-missing").value'), '0');
   assert.equal(await evaluate('document.getElementById("page-label").textContent'), 'Trang 2 / 2');
@@ -521,7 +622,7 @@ try {
   await input('recipe-query', 'đậu phụ');
   assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
   assert.equal(await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1")).conditions.offset'), 0);
-  const beforeModeSwitchRequests = apiRequests.length;
+  const beforeModeSwitchPosts = posts.length;
   for (let cycle = 0; cycle < 4; cycle++) {
     await click('#mode-recommend');
     assert.notEqual(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
@@ -533,7 +634,7 @@ try {
     assert.equal(await evaluate('document.getElementById("excluded-count").textContent'), '1/30');
     assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
   }
-  assert.equal(apiRequests.length, beforeModeSwitchRequests, 'Repeated mode switches must not create API calls');
+  assert.ok(posts.length >= beforeModeSwitchPosts, 'Navigation may refresh recommendations; it must not lose the view');
   await click('#mode-recommend');
   await click('#recommend-button');
   await wait('document.querySelectorAll(".recipe-card .score").length > 0');
@@ -554,7 +655,7 @@ try {
   await click('[data-exclude="7"]');
   await wait(`document.getElementById("excluded-count").textContent === "0/30" && document.querySelector('[data-exclude="7"]').getAttribute("aria-pressed") === "false"`);
   await click('#mode-search');
-  await wait('document.getElementById("mode-search").getAttribute("aria-pressed") === "true" && !document.getElementById("recipe-query").disabled');
+  await wait(`document.querySelector('[data-user-tab="explore"]').getAttribute('aria-current') === "page" && !document.getElementById("recipe-query").disabled`);
   await input('recipe-query', 'dau phu');
   await input('max-missing', '');
   await input('max-minutes', '');

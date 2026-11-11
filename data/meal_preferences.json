@@ -1,0 +1,23 @@
+{
+  "version": "meal-preferences-v1",
+  "basis": "positive_required_ingredient_evidence",
+  "scope": "A meal must contain at least one recipe with an explicitly named, required meat/fish/seafood ingredient in the current legacy database. Absence is unknown, never vegetarian. Optional ingredients, eggs, sauces and compound products do not establish this evidence.",
+  "approval": "No v2 source, assertion, revision or release is approved by this registry.",
+  "evidence_source": {
+    "kind": "current_legacy_database",
+    "locator": "ingredients(id,name) JOIN recipe_ingredients(ingredient_id,recipe_id,is_required=1)",
+    "checked_on": "2026-11-05",
+    "identity_check": "Exact ID and NFC name together; rechecked against MySQL on every filtered request. No inference from recipe titles or absence of animal ingredients."
+  },
+  "explicit_animal_ingredients": [
+    {"ingredient_id": 4, "expected_name": "Thịt", "kind": "meat"},
+    {"ingredient_id": 13, "expected_name": "Cá basa", "kind": "fish"},
+    {"ingredient_id": 14, "expected_name": "Thịt gà", "kind": "meat"},
+    {"ingredient_id": 28, "expected_name": "Cua đồng", "kind": "seafood"},
+    {"ingredient_id": 35, "expected_name": "Tôm", "kind": "seafood"},
+    {"ingredient_id": 36, "expected_name": "Mực", "kind": "seafood"},
+    {"ingredient_id": 37, "expected_name": "Thịt bò", "kind": "meat"},
+    {"ingredient_id": 38, "expected_name": "Thịt heo xay", "kind": "meat"},
+    {"ingredient_id": 39, "expected_name": "Sườn heo", "kind": "meat"}
+  ]
+}

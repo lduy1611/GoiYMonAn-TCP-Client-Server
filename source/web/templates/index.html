@@ -4,26 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page_title }}</title>
-  <link rel="stylesheet" href="/static/styles.css?v=ui-1.2.3">
+  <link rel="stylesheet" href="/static/styles.css?v=user-shell-2">
 </head>
 <body>
   <a class="skip-link" href="#recommend-form">Đến phần chọn nguyên liệu</a>
-  <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span><span>Hôm nay ăn gì?<small>Từ nguyên liệu trong căn bếp của bạn</small></span></a>
-    <span class="status-pill" id="server-status" role="status">Đang kiểm tra kết nối…</span>
-  </header>
+  {% include "_user_header.html" %}
   <main class="container">
     <section class="hero">
       <p class="eyebrow">Ít phân vân hơn, thêm một bữa ngon</p>
       <h1 id="hero-title">Có nguyên liệu gì,<br>mình nấu món đó.</h1>
       <p class="hero-copy" id="hero-copy">Chọn những gì bạn đang có. Tìm món phù hợp và biết rõ cần chuẩn bị thêm gì.</p>
+      <span class="status-pill page-status" id="server-status" role="status">Đang kiểm tra kết nối…</span>
       <ol class="journey" id="journey" aria-label="Cách sử dụng"><li><span>1</span> Chọn nguyên liệu</li><li><span>2</span> Tìm món phù hợp</li><li><span>3</span> Xem cách nấu</li></ol>
     </section>
-    <p class="results-context"><a class="route-link" href="/meal-plan">🍽 Mâm cơm hôm nay</a></p>
-    <div class="mode-switch" role="group" aria-label="Cách tìm món">
-      <button type="button" id="mode-search" aria-pressed="false">Tìm món theo tên</button>
-      <button type="button" id="mode-recommend" aria-pressed="true">Gợi ý theo nguyên liệu</button>
-    </div>
     <section class="workspace">
       <form id="recommend-form" class="panel controls" aria-labelledby="controls-title" tabindex="-1">
         <fieldset id="ingredient-controls">
@@ -50,7 +43,8 @@
           <section class="selection-group" aria-labelledby="excluded-title"><div class="selected-heading"><h3 id="excluded-title">Loại trừ</h3><span id="excluded-count">0/30</span></div><p class="field-help">Món có chứa những nguyên liệu này sẽ không được gợi ý.</p><div id="excluded-ingredients" class="chips empty">Không loại trừ nguyên liệu nào</div></section>
           </div>
           <div id="recommend-filter-slot"><div id="basic-filters" class="filter-grid"><label for="max-minutes">Thời gian tối đa (phút)<input id="max-minutes" type="number" min="1" max="240" step="1" placeholder="Không giới hạn"></label><label id="recommend-limit-field" for="top-k">Số món gợi ý<input id="top-k" type="number" min="1" max="20" step="1" value="5" required></label><label id="search-limit-field" class="hidden" for="search-limit">Số món mỗi trang<input id="search-limit" type="number" min="1" max="20" step="1" value="12" required disabled></label></div></div>
-          <button id="recommend-button" type="submit" class="primary" disabled><span>Tìm món phù hợp</span><span aria-hidden="true">→</span></button>
+          <p id="auto-update-help" class="field-help">Kết quả tự động cập nhật theo nguyên liệu và bộ lọc.</p>
+          <button id="recommend-button" type="submit" class="primary hidden" disabled><span>Tìm món phù hợp</span><span aria-hidden="true">→</span></button>
           <p class="submit-help" id="submit-help">Chọn ít nhất 1 nguyên liệu có sẵn để bắt đầu.</p>
         </fieldset>
       </form>
@@ -61,12 +55,12 @@
         <div id="loading" class="loading panel hidden" role="status"><span class="spinner" aria-hidden="true"></span>Đang tìm món phù hợp…</div>
         <div id="results" class="recipe-grid"></div>
         <nav id="pagination" class="pagination hidden" aria-label="Trang kết quả tìm kiếm"><button type="button" id="page-prev">← Trang trước</button><span id="page-label" role="status"></span><button type="button" id="page-next">Trang sau →</button></nav>
-        <div id="empty-state" class="empty-state panel"><div class="empty-illustration" aria-hidden="true">✦</div><h3>Bữa ngon bắt đầu từ đây</h3><p>Chọn nguyên liệu ở bên cạnh rồi bấm “Tìm món phù hợp”.</p></div>
+        <div id="empty-state" class="empty-state panel"><div class="empty-illustration" aria-hidden="true">✦</div><h3>Bữa ngon bắt đầu từ đây</h3><p>Chọn ít nhất một nguyên liệu có sẵn để nhận gợi ý tự động.</p></div>
       </section>
     </section>
   </main>
   <footer>Gợi ý mang tính tham khảo · Kiểm tra thành phần và dị ứng trước khi sử dụng</footer>
-  <script src="/static/recipe-images.js?v=ui-1.2.3" defer></script>
-  <script src="/static/app.js?v=ui-1.2.3" defer></script>
+  <script src="/static/recipe-images.js?v=images-admin-20261107" defer></script>
+  <script src="/static/app.js?v=user-shell-2" defer></script>
 </body>
 </html>

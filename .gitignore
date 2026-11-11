@@ -1,26 +1,30 @@
-# Thong tin bao mat
 .env
 .env.*
 !.env.example
-*.pem
-*.key
-
-# Python
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
-
-# File database va log runtime
-*.db
-*.sqlite3
+/.pytest_*/
+/._pytest_*/
+/.testtmp_*/
+/.test_runtime/
+/.tmp_admin_*_test_*/
 *.log
+*.log.*
+*.jsonl
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.pem
+*.key
+*.p12
+*.pfx
 statics/runtime/
-
-# Tai lieu dong goi
-BAO_CAO_TAI_LIEU/
-BAO_CAO_TAI_LIEU.zip
-
-# File tam
+statics/results/
 .vscode/
 .DS_Store
+playwright-report/
+test-results/

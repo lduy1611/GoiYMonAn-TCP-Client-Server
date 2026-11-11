@@ -1,0 +1,15 @@
+<header class="topbar user-header">
+  <a class="brand" href="/" aria-label="Hôm nay ăn gì? Trang chủ">
+    <span class="brand-mark" aria-hidden="true">✦</span>
+    <span>Hôm nay ăn gì?<small>Từ nguyên liệu trong căn bếp của bạn</small></span>
+  </a>
+  <nav class="user-nav" aria-label="Điều hướng chính">
+    <a href="/?view=explore" data-user-tab="explore" {% if active_tab == 'explore' %}aria-current="page"{% endif %}>Khám phá</a>
+    <a href="/?view=fridge" data-user-tab="fridge" {% if active_tab == 'fridge' %}aria-current="page"{% endif %}>Tủ lạnh</a>
+    <a href="/meal-plan" data-user-tab="meal" {% if active_tab == 'meal' %}aria-current="page"{% endif %}>Mâm cơm</a>
+    <a href="/?view=lunch" data-user-tab="lunch" {% if active_tab == 'lunch' %}aria-current="page"{% endif %}>Trưa nay</a>
+    <a href="/achievements" data-user-tab="achievements" {% if active_tab == 'achievements' %}aria-current="page"{% endif %}>Thành quả</a>
+  </nav>
+  <a id="user-account-tab" class="user-account-tab" href="{{ account_target or '/account/login' }}" {% if active_tab == 'account' %}aria-current="page"{% endif %}>Tài khoản</a>
+</header>
+<script src="/static/account-menu.js?v=user-shell-2" defer></script>

@@ -2,6 +2,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const key = 'goiy-meal-plan-v1';
+  const returnPath = location.pathname === '/meal-plan/v1' ? '/meal-plan/v1' : '/meal-plan';
   const slots = ['main', 'vegetable', 'soup'];
   const labels = {main: 'Món mặn', vegetable: 'Món rau', soup: 'Món canh'};
   const fields = {'meal-max-minutes': ['max_minutes', 1, 240], 'meal-max-total': ['max_total_minutes', 1, 720], 'meal-max-missing': ['max_missing', 0, 50]};
@@ -52,7 +53,7 @@
       new Set(list.map(i => i?.ingredient_id)).size === list.length && list.every(i => i && state.names.get(i.ingredient_id) === i.name &&
         !c.ingredient_ids.includes(i.ingredient_id) && !c.excluded_ids.includes(i.ingredient_id) &&
         Array.isArray(i.uses) && i.uses.length >= 1 && i.uses.length <= 3 && new Set(i.uses.map(u => u?.recipe_id)).size === i.uses.length &&
-        i.uses.every(u => u && recipeIDs.includes(u.recipe_id) && typeof u.quantity === 'string' && u.quantity.length <= 255 && typeof u.is_required === 'boolean') &&
+        i.uses.every(u => u && recipeIDs.includes(u.recipe_id) && (u.quantity === null || typeof u.quantity === 'string' && u.quantity.length <= 255) && typeof u.is_required === 'boolean') &&
         i.uses.some(u => u.is_required) === required);
     return validateShopping(p.shopping_list,true) && validateShopping(p.optional_shopping_list,false) &&
       same(p.shopping_list.map(i => i.ingredient_id),p.missing_ids) &&
@@ -110,9 +111,9 @@
     $('meal-cards').innerHTML = slots.map(slot => {
       const i = p.items.find(item => item.slot === slot);
       return '<article class="recipe-card" data-meal-slot="'+slot+'" data-recipe-id="'+i.recipe_id+'"><figure class="recipe-media" data-recipe-media data-recipe-id="'+i.recipe_id+'" data-recipe-title="'+esc(i.title)+'"></figure>'+
-        '<span class="meal-slot">'+labels[slot]+'</span><h3><a href="/recipes/'+i.recipe_id+'?return_to=%2Fmeal-plan">'+esc(i.title)+'</a></h3><div class="meta-row">◷ '+i.minutes+' phút</div>'+
+        '<span class="meal-slot">'+labels[slot]+'</span><h3><a href="/recipes/'+i.recipe_id+'?return_to=' + encodeURIComponent(returnPath) + '">'+esc(i.title)+'</a></h3><div class="meta-row">◷ '+i.minutes+' phút</div>'+
         '<p class="meal-missing">'+(i.missing_count?'Còn thiếu '+i.missing_count+' loại bắt buộc: '+i.missing_ids.map(id => esc(state.names.get(id))).join(', '):'Đã có đủ loại nguyên liệu bắt buộc')+'</p>'+
-        '<div class="meal-card-actions"><a class="detail-link" href="/recipes/'+i.recipe_id+'?return_to=%2Fmeal-plan">Xem công thức →</a><button class="retry-button" type="button" data-replace="'+slot+'" aria-label="Đổi '+labels[slot].toLowerCase()+'">Đổi món ↻</button></div></article>';
+        '<div class="meal-card-actions"><a class="detail-link" href="/recipes/'+i.recipe_id+'?return_to=' + encodeURIComponent(returnPath) + '">Xem công thức →</a><button class="retry-button" type="button" data-replace="'+slot+'" aria-label="Đổi '+labels[slot].toLowerCase()+'">Đổi món ↻</button></div></article>';
     }).join('');
     window.RecipeImages?.mount($('meal-cards'));
     const titles = new Map(p.items.map(i => [i.recipe_id,i.title]));
@@ -184,10 +185,10 @@
     $('meal-ingredients').setAttribute('aria-busy','true');
     $('meal-load-retry').classList.add('hidden');
     try {
-      const response = await fetch('/api/ingredients?limit=50');
+      const response = await fetch('/api/ingredients?limit=250');
       const envelope = await response.json();
       const data = envelope.data;
-      if (!response.ok || !envelope.ok || !text(data?.dataset_version) || !Array.isArray(data.items) || data.items.length > 50 ||
+      if (!response.ok || !envelope.ok || !text(data?.dataset_version) || !Array.isArray(data.items) || data.items.length > 250 ||
           !data.items.every(i => i && Number.isSafeInteger(i.id) && i.id > 0 && text(i.name)) || new Set(data.items.map(i => i.id)).size !== data.items.length) throw Error('Không tải được danh sách nguyên liệu.');
       state.names = new Map(data.items.map(i => [i.id,i.name]));
       state.dataset = data.dataset_version;

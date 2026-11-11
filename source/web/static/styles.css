@@ -32,6 +32,11 @@ a { color: var(--green); text-underline-offset: 4px; }
 .status-pill::before { content: ""; width: 7px; height: 7px; background: currentColor; border-radius: 50%; flex-shrink: 0; }
 .status-pill.offline { background: #fff0e9; color: #974024; }
 .header-link { font-size: 14px; font-weight: 650; text-decoration: none; }
+.topbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+.account-entry { display:flex; align-items:center; gap:8px; }
+.account-nav-link,.account-nav-register { min-height:38px; padding:7px 12px; border:1px solid var(--line); border-radius:5px; background:var(--paper); color:var(--green-dark); font:inherit; font-size:12px; font-weight:700; text-decoration:none; }
+.account-nav-register { background:var(--green); border-color:var(--green); color:#fff; }
+.account-nav-name { max-width:140px; overflow:hidden; text-overflow:ellipsis; color:var(--green-dark); font-size:12px; font-weight:700; }
 .container { max-width: 1240px; margin: 0 auto; padding: 48px 24px 72px; }
 .hero { text-align: center; padding: 4px 0 32px; }
 .eyebrow { text-transform: uppercase; letter-spacing: .12em; color: var(--orange); font-size: 11px; font-weight: 750; margin: 0 0 10px; }
@@ -41,9 +46,7 @@ a { color: var(--green); text-underline-offset: 4px; }
 .journey li { display: flex; align-items: center; gap: 8px; }
 .journey span { display: grid; place-items: center; background: #e6ecdf; width: 25px; height: 25px; border-radius: 50%; color: var(--green-dark); font-size: 11px; font-weight: 700; }
 .workspace { display: grid; grid-template-columns: minmax(310px, 360px) minmax(0, 1fr); gap: 28px; align-items: start; margin-top: 12px; }
-.mode-switch { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 0 0 28px; }
-.mode-switch button, .pagination button { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--green); padding: 10px 16px; font-weight: 650; }
-.mode-switch button[aria-pressed="true"] { background: var(--green); color: #fff; border-color: var(--green); }
+.pagination button { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--green); padding: 10px 16px; font-weight: 650; }
 .recipe-query { width: 100%; min-width: 0; border: 1px solid #cbd5c8; border-radius: 10px; background: #fbfcf9; padding: 12px; font-size: 16px; color: var(--ink); }
 .advanced-toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 64px; margin-top: 22px; padding: 12px 14px; text-align: left; background: #f4f8f0; border: 1px solid #d6e1cf; border-radius: 12px; color: var(--green-dark); }
 .advanced-label { display: block; font-size: 14px; font-weight: 700; }
@@ -168,6 +171,7 @@ footer { text-align: center; color: var(--muted); border-top: 1px solid var(--li
 }
 @media (max-width: 760px) {
   .topbar { min-height: 76px; padding: 12px 18px; flex-wrap: wrap; gap: 8px; }
+  .topbar-actions { width:100%; justify-content:space-between; }
   .brand { font-size: 17px; }
   .brand small { font-size: 10px; }
   .status-pill { padding: 5px 9px; font-size: 10px; }
@@ -196,3 +200,40 @@ footer { text-align: center; color: var(--muted); border-top: 1px solid var(--li
   .results-heading h2 { font-size: 27px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Keep automatic update status out of document flow to preserve scroll position. */
+#results-area { position: relative; }
+#results-area > .loading { position: absolute; top: 0; right: 0; z-index: 2; max-width: 100%; padding: 10px 14px; font-size: 13px; pointer-events: none; }
+
+
+/* Consumer navigation shared by discovery and meal planning. */
+.user-nav{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.user-nav::-webkit-scrollbar{display:none}
+.user-nav a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:8px 12px;border-radius:999px;color:var(--muted);font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;transition:background .16s ease,color .16s ease}
+.user-nav a:hover,.user-nav a[aria-current="page"]{background:var(--sage);color:var(--green)}
+.user-nav a:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+@media(max-width:900px){.topbar{gap:10px}.user-nav{order:3;flex:1 0 100%;justify-content:flex-start;padding:2px 0 4px}.topbar-actions{margin-left:auto}}
+@media(max-width:540px){.user-nav a{min-height:40px;padding:7px 10px;font-size:12px}.topbar{position:sticky}}
+
+/* Shared user shell: the four primary tabs stay centered and the account tab stays at the right edge. */
+.user-header{display:grid;grid-template-columns:minmax(210px,1fr) auto minmax(100px,1fr);align-items:center;justify-content:initial;gap:18px}
+.user-header>.brand{grid-column:1;grid-row:1;min-width:0}
+.user-header>.user-nav{grid-column:2;grid-row:1;justify-content:center;order:initial;flex:none;overflow:visible}
+.user-account-tab{grid-column:3;grid-row:1;justify-self:end;display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:8px 14px;border-radius:999px;color:var(--muted);font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap}
+.user-account-tab:hover,.user-account-tab[aria-current="page"]{background:var(--sage);color:var(--green)}
+.user-account-tab:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.page-status{display:inline-flex;margin-top:16px}
+@media(max-width:900px){.user-header{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px}.user-header>.brand{grid-column:1;grid-row:1}.user-header>.user-nav{grid-column:1/-1;grid-row:2;justify-content:flex-start;overflow-x:auto;padding:2px 0 4px}.user-header>.user-account-tab{grid-column:2;grid-row:1}}
+@media(max-width:540px){.user-header{position:sticky;padding:10px 14px}.user-header>.brand small{max-width:180px}.user-nav a,.user-account-tab{min-height:40px;padding:7px 10px;font-size:12px}}
+
+.achievement-submit-section{margin:34px 0 44px;padding:22px;border:1px solid var(--line);border-radius:20px;background:var(--paper)}
+.achievement-submit-heading h2{margin:0 0 6px;font-size:26px}.achievement-submit-heading p:last-child{color:var(--muted);margin:0 0 18px}
+#achievement-submit-form{display:grid;gap:9px}#achievement-submit-form>label{font-weight:700;margin-top:6px}#achievement-submit-form>label span{color:var(--muted);font-weight:500;font-size:13px}
+#achievement-submit-form input[type=file],#achievement-submit-form input:not([type=file]),#achievement-submit-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:11px;background:var(--paper);padding:11px 12px;font:inherit}
+#achievement-submit-form input[type=file]{padding:12px;background:var(--sage);border-style:dashed}
+#achievement-submit-form input:focus,#achievement-submit-form textarea:focus{outline:0;border-color:var(--green);box-shadow:0 0 0 3px rgba(49,93,70,.14)}
+#achievement-submit-button{justify-self:start;border:0;border-radius:999px;background:var(--green);color:#fff;padding:12px 20px;font:inherit;font-weight:750;cursor:pointer;transition:background-color .16s ease,transform .16s ease}
+#achievement-submit-button:hover{background:var(--green-dark)}#achievement-submit-button:active{transform:translateY(1px)}#achievement-submit-button:focus-visible{outline:2px solid var(--green-dark);outline-offset:3px}
+#achievement-submit-button:disabled{opacity:.6;cursor:wait}#achievement-submit-status{min-height:22px;margin:2px 0;color:var(--green)}#achievement-submit-status.error{color:#a43322}#achievement-submit-status a{margin-left:6px;color:var(--green-dark);font-weight:700}
+.achievement-photo-preview{display:flex;gap:8px;overflow-x:auto}.achievement-photo-preview img{width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+@media(max-width:540px){.achievement-submit-section{margin:24px 0 34px;padding:17px;border-radius:15px}.achievement-submit-heading h2{font-size:23px}#achievement-submit-button{width:100%}}

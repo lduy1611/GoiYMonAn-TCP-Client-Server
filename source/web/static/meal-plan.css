@@ -1,4 +1,7 @@
 .meal-page .meal-container { max-width: 1440px; }
+.meal-page .recipe-card.is-pinned { outline: 2px solid var(--green); outline-offset: 2px; }
+.meal-page .meal-pin { min-height: 44px; margin: 0 18px 12px; align-self: start; }
+.meal-page .meal-pin[aria-pressed="true"] { background: var(--sage); color: var(--green); }
 .meal-page .meal-hero { padding-bottom: 32px; }
 .meal-page .meal-hero h1 { font-size: clamp(36px, 4.6vw, 56px); }
 .meal-page .meal-kicker { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 18px; padding: 0; list-style: none; color: var(--green); font-size: 12px; margin-top: 22px; }
@@ -21,10 +24,18 @@
 .meal-page .meal-filters { display: grid; gap: 14px; margin-top: 22px; }
 .meal-page .meal-filters label { font-size: 13px; font-weight: 650; }
 .meal-page .meal-filters input { display: block; width: 100%; border: 1px solid #cbd5c8; border-radius: 10px; padding: 10px; margin-top: 6px; background: #fbfcf9; font-size: 16px; min-width: 0; }
+.meal-page .meal-filters select { display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 6px; padding: 10px; border: 1px solid #cbd5c8; border-radius: 10px; background: #fbfcf9; font-size: 16px; }
+.meal-page .meal-filters > .field-help { margin: -8px 0 0; overflow-wrap: anywhere; }
 .meal-page .meal-results { min-width: 0; scroll-margin-top: 110px; }
 .meal-page .meal-results-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .meal-page .meal-results-heading .retry-button { margin: 0; }
 .meal-page .meal-summary { padding: 14px 18px; border: 1px solid #d6e1cf; border-radius: 12px; background: var(--sage); font-size: 13px; margin: 0 0 18px; }
+.meal-page .meal-people { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 18px; margin-bottom: 18px; }
+.meal-page .meal-people h3 { margin: 0; font-size: 17px; }
+.meal-page .meal-people .field-help { margin: 6px 0 0; }
+.meal-page .meal-people-stepper { display: flex; align-items: center; gap: 8px; }
+.meal-page .meal-people-stepper button { min-width: 44px; min-height: 44px; margin: 0; font-size: 20px; }
+.meal-page .meal-people-stepper output { min-width: 64px; text-align: center; font-weight: 650; }
 .meal-page .meal-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .meal-page .recipe-card { padding: 18px; }
 .meal-page .recipe-card .recipe-media { margin: -18px -18px 16px; }
@@ -35,7 +46,7 @@
 .meal-page .meal-card-actions .detail-link { margin: 0; min-height: 44px; align-items: center; display: flex; }
 .meal-page .meal-card-actions button { margin: 0; }
 .meal-page .meal-shopping { padding: 24px; margin-top: 24px; }
-.meal-page .meal-shopping-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.meal-page .meal-shopping-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .meal-page .meal-shopping h3 { font-size: 15px; }
 .meal-page .shopping-entry { border-top: 1px solid var(--line); padding-block: 12px; overflow-wrap: anywhere; }
 .meal-page .shopping-entry ul { padding-left: 18px; margin: 6px 0 0; font-size: 12px; color: var(--muted); }
@@ -54,3 +65,24 @@
   .meal-page .meal-kicker { max-width: 260px; margin-inline: auto; line-height: 2; }
   .meal-page .meal-results-heading .retry-button { width: 100%; }
 }
+
+
+.meal-page .meal-type-switch{display:flex;gap:8px;overflow-x:auto;padding:6px;margin:-8px 0 22px;border:1px solid var(--line);border-radius:14px;background:#fff;scrollbar-width:thin}
+.meal-page .meal-type-switch button{flex:0 0 auto;min-height:42px;padding:9px 16px;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;white-space:nowrap}
+.meal-page .meal-type-switch button[aria-pressed="true"]{background:var(--green);color:#fff}
+.meal-page .meal-type-switch button:disabled{opacity:.48;cursor:not-allowed}
+.meal-page .meal-type-switch button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.meal-page #meal-copy-list{margin:8px 0}
+.meal-page .meal-results-heading>div{min-width:0}
+@media(max-width:760px){.meal-page .meal-type-switch{margin-inline:-2px}.meal-page .user-nav{order:3}.meal-page .meal-people{align-items:flex-start}.meal-page .meal-card-actions{display:grid;grid-template-columns:1fr 1fr}.meal-page .meal-pin{margin-inline:0;width:100%}}
+@media(max-width:390px){.meal-page .meal-card-actions{grid-template-columns:1fr}.meal-page .meal-type-switch button{padding-inline:12px}}
+.meal-page .meal-person-groups{display:grid;gap:8px;min-width:min(100%,260px)}
+.meal-page .meal-custom-layout{flex-basis:100%;margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fffdf8}
+.meal-page .meal-custom-layout h4{display:flex;justify-content:space-between;gap:10px;margin:0 0 10px;color:var(--green)}
+.meal-page .meal-custom-layout .meal-person-groups{grid-template-columns:1fr}
+.meal-page .meal-custom-layout output{min-width:2ch}
+.meal-page .meal-person-stepper{display:grid;grid-template-columns:minmax(82px,1fr) 44px 34px 44px;align-items:center;gap:4px}
+.meal-page .meal-person-stepper>span{font-size:12px;font-weight:700}
+.meal-page .meal-person-stepper button{min-width:40px;min-height:40px;margin:0}
+.meal-page .meal-person-stepper output{text-align:center;font-weight:700}
+@media(max-width:760px){.meal-page .meal-person-groups{width:100%}}

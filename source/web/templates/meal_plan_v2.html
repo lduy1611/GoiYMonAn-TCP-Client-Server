@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }} · Hôm nay ăn gì?</title>
+  <link rel="stylesheet" href="/static/styles.css?v=user-shell-2">
+  <link rel="stylesheet" href="/static/meal-plan.css?v=meal-layout-20261110-2">
+</head>
+<body class="meal-page" data-classification-version="{{ classification_version }}">
+  <a class="skip-link" href="#meal-form">Đến phần tạo mâm cơm</a>
+  {% include "_user_header.html" %}
+  <main class="container meal-container">
+    <section class="hero meal-hero">
+      <p class="eyebrow">Một bữa cơm, bớt một lần phân vân</p>
+      <h1>Mâm cơm của bạn</h1>
+    </section>
+    <nav id="meal-types" class="meal-type-switch" aria-label="Kiểu mâm cơm">
+      <button type="button" data-meal-type="daily">Hằng ngày</button>
+      <button type="button" data-meal-type="guests">Đãi khách</button>
+      <button type="button" data-meal-type="drinks" disabled title="Chưa có metadata và vai trò món để ghép mồi nhậu.">Mồi nhậu</button>
+      <button type="button" data-meal-type="custom" aria-pressed="false">Tự chọn</button>
+    </nav>
+    <div class="meal-workspace">
+      <form id="meal-form" class="panel meal-controls" tabindex="-1" aria-labelledby="meal-controls-title">
+        <h2 id="meal-controls-title">Căn bếp của bạn</h2>
+        <section class="panel meal-people" aria-labelledby="meal-people-title">
+          <div><h3 id="meal-people-title">Số người ăn</h3></div>
+          <div class="meal-person-groups">
+            <div class="meal-person-stepper" role="group" aria-label="Số người lớn"><span>Người lớn</span><button id="meal-adults-minus" class="retry-button" type="button" aria-label="Giảm người lớn">−</button><output id="meal-adults" aria-live="polite">4</output><button id="meal-adults-plus" class="retry-button" type="button" aria-label="Tăng người lớn">+</button></div>
+            <div class="meal-person-stepper" role="group" aria-label="Số trẻ em"><span>Trẻ em</span><button id="meal-children-minus" class="retry-button" type="button" aria-label="Giảm trẻ em" disabled>−</button><output id="meal-children" aria-live="polite">0</output><button id="meal-children-plus" class="retry-button" type="button" aria-label="Tăng trẻ em">+</button></div>
+          </div>
+          <section id="meal-custom-layout" class="meal-custom-layout hidden" aria-label="Tùy chỉnh số món">
+            <h4>Số món trong mâm <span id="meal-custom-total">3/6</span></h4>
+            <div class="meal-person-groups">
+              <div class="meal-person-stepper" role="group" aria-label="Số món chính"><span>Món chính</span><button class="retry-button" type="button" data-layout-minus="main" aria-label="Giảm món chính">−</button><output id="meal-count-main" aria-live="polite">1</output><button class="retry-button" type="button" data-layout-plus="main" aria-label="Tăng món chính">+</button></div>
+              <div class="meal-person-stepper" role="group" aria-label="Số món rau"><span>Món rau</span><button class="retry-button" type="button" data-layout-minus="vegetable" aria-label="Giảm món rau">−</button><output id="meal-count-vegetable" aria-live="polite">1</output><button class="retry-button" type="button" data-layout-plus="vegetable" aria-label="Tăng món rau">+</button></div>
+              <div class="meal-person-stepper" role="group" aria-label="Số món canh"><span>Món canh</span><button class="retry-button" type="button" data-layout-minus="soup" aria-label="Giảm món canh">−</button><output id="meal-count-soup" aria-live="polite">1</output><button class="retry-button" type="button" data-layout-plus="soup" aria-label="Tăng món canh">+</button></div>
+            </div>
+          </section>
+        </section>
+        <label class="field-label" for="meal-ingredient-search">Tìm nguyên liệu</label>
+        <input id="meal-ingredient-search" class="recipe-query" type="search" placeholder="Ví dụ: trứng, rau muống…" autocomplete="off" disabled>
+        <div id="meal-ingredients" class="meal-ingredients" aria-label="Chọn nguyên liệu" aria-busy="true"></div>
+        <button id="meal-load-retry" class="retry-button hidden" type="button">Thử tải nguyên liệu lại</button>
+        <section class="meal-selection"><h3>Có sẵn <span id="meal-selected-count">0/30</span></h3><div id="meal-selected" class="chips"></div></section>
+        <section class="meal-selection"><h3>Loại trừ <span id="meal-excluded-count">0/30</span></h3><div id="meal-excluded" class="chips"></div></section>
+        <p id="meal-feedback" class="field-help" role="status"></p>
+        <div class="meal-filters">
+          <label for="meal-pref-diet">Chế độ ăn<select id="meal-pref-diet" disabled><option value="">Không giới hạn</option></select></label>
+          <label for="meal-pref-region">Vùng miền<select id="meal-pref-region" disabled><option value="">Không giới hạn</option></select></label>
+          <p id="meal-filter-message" class="field-help hidden" role="status"></p>
+          <button id="meal-filter-retry" class="retry-button hidden" type="button">Thử tải lại bộ lọc</button>
+          <label for="meal-max-minutes">Tối đa mỗi món (phút)<input id="meal-max-minutes" type="number" min="1" max="240" step="1" placeholder="Không giới hạn" disabled></label>
+          <label for="meal-max-total">Tổng thời gian (phút)<input id="meal-max-total" type="number" min="1" max="1440" step="1" placeholder="Không giới hạn" disabled></label>
+          <label for="meal-max-missing">Thiếu tối đa (loại bắt buộc)<input id="meal-max-missing" type="number" min="0" max="50" step="1" placeholder="Không giới hạn" disabled></label>
+        </div>
+        <button id="meal-generate" class="primary" type="submit" disabled>Ghép mâm ngay <span aria-hidden="true">→</span></button>
+      </form>
+      <section id="meal-results" class="meal-results" aria-busy="false" aria-labelledby="meal-results-title">
+        <div class="meal-results-heading"><div><p class="eyebrow">Bữa cơm theo lựa chọn</p><h2 id="meal-results-title" tabindex="-1">Mâm cơm của bạn</h2></div><button id="meal-regenerate" class="retry-button hidden" type="button">Đổi cả mâm ↻</button></div>
+        <div id="meal-loading" class="loading panel hidden" role="status"><span class="spinner" aria-hidden="true"></span>Đang ghép mâm từ dữ liệu công thức…</div>
+        <p id="meal-message" class="meal-message hidden" role="status" aria-live="polite"></p>
+        <button id="meal-retry" class="retry-button hidden" type="button">Thử lại</button>
+        <div id="meal-empty" class="empty-state panel"><h3>Bắt đầu một bữa cơm ngon</h3><p>Mâm cơm sẽ được gợi ý tự động. Bạn có thể chỉnh bộ lọc để cập nhật kết quả.</p></div>
+        <p id="meal-stale" class="field-help hidden" role="status">Mâm đang được cập nhật theo lựa chọn mới; món ghim được giữ lại nếu còn phù hợp.</p>
+        <p id="meal-summary" class="meal-summary hidden"></p>
+        <div id="meal-cards" class="meal-cards"></div>
+        <section id="meal-shopping" class="panel meal-shopping hidden" aria-labelledby="meal-shopping-title">
+          <p class="eyebrow">Chuẩn bị trước khi nấu</p><h2 id="meal-shopping-title">Danh sách đi chợ</h2><button id="meal-copy-list" class="retry-button" type="button">Sao chép danh sách</button>
+          <p id="meal-shopping-note" class="field-help">Danh sách nguyên liệu theo công thức; lượng tính được sẽ cập nhật sau khi tính khẩu phần.</p>
+          <p id="meal-copy-feedback" class="field-help" role="status"></p><div class="meal-shopping-columns"><section><h3>Bắt buộc</h3><div id="meal-shopping-required"></div></section><section><h3>Tùy chọn</h3><div id="meal-shopping-optional"></div></section><section><h3>Chưa rõ tính chất</h3><div id="meal-shopping-unknown"></div></section></div>
+        </section>
+      </section>
+    </div>
+  </main>
+  <footer>Gợi ý mang tính tham khảo · Thành phần và định lượng theo dữ liệu công thức hiện có.</footer>
+  <script src="/static/recipe-images.js?v=images-admin-20261107" defer></script>
+  <script src="/static/meal-plan-v2.js?v=meal-shopping-20261110-3" defer></script>
+</body>
+</html>

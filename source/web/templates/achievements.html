@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f0e5">
+  <title>{{ page_title }}</title>
+  <link rel="stylesheet" href="/static/styles.css?v=user-shell-2">
+  <link rel="stylesheet" href="/static/achievements.css?v=achievement-green-20261110">
+</head>
+<body class="achievements-page">
+  {% include "_user_header.html" %}
+  <main class="achievement-shell">
+    <section class="achievement-feed" aria-labelledby="achievement-title">
+      <header class="achievement-feed-heading"><div><p class="eyebrow">CÙNG NẤU, CÙNG CHIA SẺ</p><h1 id="achievement-title">Thành quả</h1><p>Món bạn đã nấu theo công thức trên Hôm nay ăn gì?, mới nhất trước.</p></div></header>
+      <form id="achievement-search" class="achievement-search"><label for="achievement-query">Tìm món hoặc người đăng</label><div><input id="achievement-query" maxlength="80" placeholder="Tên món, tên người dùng"><button type="submit">Tìm kiếm</button></div></form>
+      <p id="achievement-feed-status" class="achievement-status" role="status" aria-live="polite">Đang tải bài đăng…</p>
+      <div id="achievement-feed-list" class="achievement-feed-list" aria-live="polite"></div>
+      <button id="achievement-more" class="achievement-more" type="button" hidden>Tải thêm</button>
+    </section>
+    <aside class="achievement-invite"><span class="achievement-invite-mark" aria-hidden="true">✦</span><h2>Khoe món bạn nấu</h2><p>Nấu xong món nào, chia sẻ ảnh và vài dòng về thành quả của bạn.</p><a href="/">Chọn món để nấu</a></aside>
+  </main>
+  <script src="/static/achievements.js?v=achievement-comments-collapse-20261110" defer></script>
+</body>
+</html>

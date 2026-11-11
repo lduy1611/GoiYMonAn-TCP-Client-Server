@@ -1,9 +1,11 @@
 const state = {
   available: new Map(), excluded: new Map(), ingredients: new Map(),
   visible: [], busy: false, searchVersion: 0, datasetVersion: null, view: null,
-  mode: 'recommend', offset: 0, advancedOpen: false
+  mode: 'recommend', offset: 0, advancedOpen: false, requestVersion: 0, controller: null, recommendTimer: null,
+  selectionNotice: ''
 };
 const $ = id => document.getElementById(id);
+const validRecipeID = value => Number.isSafeInteger(value) && (value >= 1 && value <= 4294967295 || value > 4294967296 && value <= 8589934591);
 const storageKey = 'goiy-selection-v1';
 const readableError = error => error instanceof TypeError
   ? 'Không thể kết nối máy chủ. Hãy kiểm tra kết nối và thử lại.'
@@ -55,6 +57,16 @@ function validIds(ids, limit = 30) {
     ids.every(id => Number.isInteger(id) && id > 0 && state.ingredients.has(id));
 }
 
+function validPublicIngredientId(id) {
+  return Number.isSafeInteger(id) &&
+    (id >= 1 && id <= 4294967295 || id > 4294967296 && id <= 8589934591);
+}
+
+function validPublicIds(ids, limit = 30) {
+  return Array.isArray(ids) && ids.length <= limit && new Set(ids).size === ids.length &&
+    ids.every(validPublicIngredientId);
+}
+
 function validCachedView(view) {
   if (!view || typeof view !== 'object' || view.signature !== conditionSignature() ||
       view.datasetVersion !== state.datasetVersion) return false;
@@ -69,14 +81,14 @@ function validCachedView(view) {
   const unitScore = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
   const recipeIds = new Set();
   return view.items.every(item => {
-    if (!item || typeof item !== 'object' || !Number.isInteger(item.recipe_id) || item.recipe_id <= 0 || recipeIds.has(item.recipe_id)) return false;
+    if (!item || typeof item !== 'object' || !validRecipeID(item.recipe_id) || recipeIds.has(item.recipe_id)) return false;
     recipeIds.add(item.recipe_id);
     return typeof item.title === 'string' && item.title.trim().length > 0 && item.title.length <= 255 &&
       Number.isInteger(item.minutes) && item.minutes >= 1 && item.minutes <= 240 &&
       (!$('max-minutes').value || item.minutes <= Number($('max-minutes').value)) &&
       (searching ? !('score' in item) && !('coverage' in item) && !('input_use' in item)
         : unitScore(item.score) && unitScore(item.coverage) && unitScore(item.input_use)) &&
-      validIds(item.matched_ids) && (searching || item.matched_ids.length > 0) && validIds(item.missing_ids, 50) &&
+      validIds(item.matched_ids) && (searching || item.matched_ids.length > 0) && validPublicIds(item.missing_ids, 50) &&
       Number.isInteger(item.missing_count) && item.missing_count === item.missing_ids.length &&
       (!searching || $('max-missing').value === '' || item.missing_count <= Number($('max-missing').value)) &&
       item.matched_ids.every(id => state.available.has(id)) &&
@@ -94,7 +106,7 @@ function restoreSelection() {
     const conditions = saved.version >= 2 ? saved.conditions : saved;
     const validNumber = (value, max, min = 1) => typeof value === 'string' && /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max;
     const mode = saved.version === 3 ? conditions?.mode : 'recommend';
-    if (!conditions || !validIds(conditions.available) || !validIds(conditions.excluded) ||
+    if (!conditions || !validPublicIds(conditions.available) || !validPublicIds(conditions.excluded) ||
         conditions.available.some(id => conditions.excluded.includes(id)) ||
         !['recommend', 'search'].includes(mode) ||
         !(conditions.maxMinutes === '' || validNumber(conditions.maxMinutes, 240)) ||
@@ -105,8 +117,14 @@ function restoreSelection() {
     state.mode = mode;
     state.advancedOpen = saved.advancedOpen === true;
     state.offset = mode === 'search' ? conditions.offset : 0;
-    state.available = new Map(conditions.available.map(id => [id, state.ingredients.get(id)]));
-    state.excluded = new Map(conditions.excluded.map(id => [id, state.ingredients.get(id)]));
+    const available=conditions.available.filter(id=>state.ingredients.has(id));
+    const excluded=conditions.excluded.filter(id=>state.ingredients.has(id));
+    const staleCount=conditions.available.length-available.length+conditions.excluded.length-excluded.length;
+    state.selectionNotice=staleCount
+      ?'Danh m\u1ee5c nguy\u00ean li\u1ec7u \u0111\u00e3 thay \u0111\u1ed5i. \u0110\u00e3 b\u1ecf '+staleCount+' l\u1ef1a ch\u1ecdn c\u0169 kh\u00f4ng c\u00f2n trong danh m\u1ee5c User; kh\u00f4ng thay b\u1eb1ng nguy\u00ean li\u1ec7u kh\u00e1c. H\u00e3y ch\u1ecdn l\u1ea1i n\u1ebfu c\u1ea7n.'
+      :'';
+    state.available = new Map(available.map(id => [id, state.ingredients.get(id)]));
+    state.excluded = new Map(excluded.map(id => [id, state.ingredients.get(id)]));
     $('max-minutes').value = conditions.maxMinutes;
     $('top-k').value = validNumber(conditions.topK, 20) ? conditions.topK : '5';
     $('recipe-query').value = typeof conditions.recipeQuery === 'string' && conditions.recipeQuery.length <= 80 ? conditions.recipeQuery : '';
@@ -128,10 +146,13 @@ function restoreSelection() {
     } else {
       invalidateResults();
     }
+    saveSelection();
+    if(state.selectionNotice)$('selection-feedback').textContent=state.selectionNotice;
     if (Number.isFinite(saved.scrollY) && saved.scrollY >= 0) requestAnimationFrame(() => window.scrollTo(0, saved.scrollY));
   } catch {
     try { sessionStorage.removeItem(storageKey); } catch { /* Storage is optional. */ }
     state.view = null;
+    state.selectionNotice='L\u1ef1a ch\u1ecdn \u0111\u00e3 l\u01b0u kh\u00f4ng c\u00f2n h\u1ee3p l\u1ec7; \u0111\u00e3 x\u00f3a l\u1ef1a ch\u1ecdn c\u0169. Kh\u00f4ng c\u00f3 nguy\u00ean li\u1ec7u n\u00e0o \u0111\u01b0\u1ee3c t\u1ef1 thay th\u1ebf.';
   }
 }
 
@@ -154,7 +175,7 @@ async function loadIngredients(query = '', restore = false) {
   const box = $('ingredient-results');
   box.setAttribute('aria-busy', 'true');
   try {
-    const response = await fetch('/api/ingredients?query=' + encodeURIComponent(query) + '&limit=50');
+    const response = await fetch('/api/ingredients?query=' + encodeURIComponent(query) + '&limit=250');
     const envelope = await response.json();
     if (version !== state.searchVersion) return;
     if (!response.ok || !envelope.ok) throw Error(envelope.error?.message || 'Không tải được nguyên liệu.');
@@ -162,8 +183,20 @@ async function loadIngredients(query = '', restore = false) {
     if (restore) state.datasetVersion = envelope.data.dataset_version;
     items.forEach(item => state.ingredients.set(item.id, item.name));
     state.visible = items;
-    if (restore) restoreSelection();
+    if (restore) {
+      restoreSelection();
+      const entryView = new URLSearchParams(location.search).get('view');
+      if (entryView === 'explore') { state.mode = 'search'; $('recipe-query').value = ''; state.offset = 0; }
+      else if (entryView === 'fridge') { state.mode = 'recommend'; state.offset = 0; }
+      else if (entryView === 'lunch') { state.mode = 'search'; $('recipe-query').value = ''; $('max-minutes').value = '30'; state.offset = 0; }
+      document.querySelectorAll('[data-user-tab]').forEach(link => {
+        const active = link.dataset.userTab === entryView;
+        if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+      });
+    }
     render();
+    if (restore && state.mode === 'recommend' && state.available.size && !state.view) scheduleRecommendation();
+    if (restore && state.selectionNotice) $('selection-feedback').textContent=state.selectionNotice;
     if (restore && $('ingredient-search').value) loadIngredients($('ingredient-search').value);
   } catch (error) {
     if (version !== state.searchVersion) return;
@@ -184,13 +217,13 @@ function invalidateResults() {
   $('result-context').textContent = 'Kết quả dựa trên nguyên liệu và bộ lọc bạn chọn.';
   showEmpty(
     state.mode === 'search' ? 'Bạn muốn tìm món gì?' : state.available.size ? 'Sẵn sàng tìm món phù hợp' : 'Bữa ngon bắt đầu từ đây',
-    state.mode === 'search' ? 'Nhập tên món hoặc để trống để duyệt. Không cần chọn nguyên liệu.' : state.available.size ? 'Bấm “Tìm món phù hợp” để cập nhật gợi ý theo lựa chọn mới.' : 'Chọn ít nhất một nguyên liệu có sẵn để bắt đầu.'
+    state.mode === 'search' ? 'Nhập tên món hoặc để trống để duyệt. Không cần chọn nguyên liệu.' : state.available.size ? 'Kết quả tự động cập nhật theo nguyên liệu và bộ lọc.' : 'Chọn ít nhất một nguyên liệu có sẵn để bắt đầu.'
   );
   saveSelection();
 }
 
 function chooseIngredient(id, destination) {
-  if (state.busy || !state.ingredients.has(id)) return;
+  if (!state.ingredients.has(id)) return;
   const target = destination === 'available' ? state.available : state.excluded;
   const other = destination === 'available' ? state.excluded : state.available;
   if (target.has(id)) {
@@ -207,9 +240,43 @@ function chooseIngredient(id, destination) {
   selectionChanged();
 }
 
-function selectionChanged() {
+// Invalidate immediately, including the debounce window: an older response must
+// never update the view, storage, or loading state for newer filters.
+function cancelRecommendation() {
+  clearTimeout(state.recommendTimer);
+  ++state.requestVersion;
+  state.controller?.abort();
+  state.controller = null;
+  state.busy = false;
+  $('loading').classList.add('hidden');
+  $('results-area').setAttribute('aria-busy', 'false');
+}
+
+function scheduleRecommendation() {
+  cancelRecommendation();
+  state.offset = 0;
+  state.view = null;
+  $('pagination').classList.add('hidden');
+  $('message').classList.add('hidden');
   render();
-  invalidateResults();
+  if (state.mode !== 'recommend' || !state.available.size) {
+    invalidateResults();
+    return;
+  }
+  saveSelection();
+  if (!$('recommend-form').checkValidity()) {
+    $('selection-feedback').textContent = 'Hãy nhập thời gian từ 1–240 phút và số món từ 1–20.';
+    return;
+  }
+  $('selection-feedback').textContent = state.selectionNotice || 'Đang cập nhật gợi ý theo lựa chọn mới…';
+  $('loading').classList.remove('hidden');
+  $('results-area').setAttribute('aria-busy', 'true');
+  state.recommendTimer = setTimeout(() => recommend(), 300);
+}
+
+function selectionChanged() {
+  state.selectionNotice='';
+  scheduleRecommendation();
 }
 
 function syncAdvanced() {
@@ -219,7 +286,7 @@ function syncAdvanced() {
   const toggle = $('advanced-toggle');
   if (!expanded && panel.contains(document.activeElement)) toggle.focus({preventScroll: true});
   toggle.classList.toggle('hidden', !searching);
-  toggle.disabled = state.busy;
+  toggle.disabled = false;
   toggle.setAttribute('aria-expanded', String(expanded));
   panel.classList.toggle('hidden', !expanded);
   panel.classList.toggle('advanced-content', searching);
@@ -233,7 +300,7 @@ function syncMode() {
   $('recommend-form').setAttribute('aria-labelledby', searching ? 'search-title' : 'controls-title');
   $('hero-title').innerHTML = searching ? 'Bạn muốn nấu<br>món gì hôm nay?' : 'Có nguyên liệu gì,<br>mình nấu món đó.';
   $('hero-copy').textContent = searching ? 'Tìm công thức theo tên. Thêm bộ lọc khi cần, không cần chọn nguyên liệu để bắt đầu.' : 'Chọn những gì bạn đang có. Tìm món phù hợp và biết rõ cần chuẩn bị thêm gì.';
-  const steps = searching ? ['Nhập tên món', 'Lọc theo sở thích', 'Xem cách nấu'] : ['Chọn nguyên liệu', 'Tìm món phù hợp', 'Xem cách nấu'];
+  const steps = searching ? ['Nhập tên món', 'Lọc theo sở thích', 'Xem cách nấu'] : ['Chọn nguyên liệu', 'Nhận gợi ý tự động', 'Xem cách nấu'];
   $('journey').innerHTML = steps.map((step, index) => '<li><span>' + (index + 1) + '</span> ' + step + '</li>').join('');
   syncAdvanced();
   $('search-fields').classList.toggle('hidden', !searching);
@@ -241,11 +308,15 @@ function syncMode() {
   $('recommend-limit-field').classList.toggle('hidden', searching);
   for (const id of ['recipe-query', 'max-missing', 'search-limit']) $(id).disabled = !searching;
   $('top-k').disabled = searching;
-  for (const mode of ['search', 'recommend']) {
-    $('mode-' + mode).setAttribute('aria-pressed', String(state.mode === mode));
-    $('mode-' + mode).disabled = state.busy;
-  }
+  $('recommend-button').classList.toggle('hidden', !searching);
+  $('auto-update-help').classList.toggle('hidden', searching);
   $('recommend-button').querySelector('span').textContent = searching ? 'Tìm kiếm món ăn' : 'Tìm món phù hợp';
+  const entryView = new URLSearchParams(location.search).get('view');
+  const activeTab = entryView === 'lunch' ? 'lunch' : searching ? 'explore' : 'fridge';
+  document.querySelectorAll('[data-user-tab]').forEach(link => {
+    if (link.dataset.userTab === activeTab) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
 }
 
 function render() {
@@ -260,9 +331,9 @@ function render() {
   $('excluded-ingredients').className = 'chips' + (state.excluded.size ? '' : ' empty');
   $('excluded-ingredients').innerHTML = state.excluded.size ? [...state.excluded].map(([id, name]) => chip(id, name, true)).join('') : 'Không loại trừ nguyên liệu nào';
   $('recommend-button').disabled = state.busy || state.mode === 'recommend' && !state.available.size;
-  $('clear-selection').disabled = state.busy || !(state.available.size + state.excluded.size);
+  $('clear-selection').disabled = !(state.available.size + state.excluded.size);
   $('submit-help').textContent = state.mode === 'search' ? 'Chưa chọn nguyên liệu: tính tất cả nguyên liệu bắt buộc là thiếu. Bạn vẫn có thể tìm hoặc duyệt món.' : state.available.size
-    ? 'Bạn có thể đổi bộ lọc để tìm món khác.'
+    ? 'Bạn có thể đổi bộ lọc để tự động cập nhật gợi ý.'
     : 'Chọn ít nhất 1 nguyên liệu có sẵn để bắt đầu.';
   renderIngredientResults();
 }
@@ -286,7 +357,7 @@ function showEmpty(message, detail) {
 }
 
 function ingredientTags(ids) {
-  return ids.map(id => '<span class="ingredient-tag">' + esc(state.ingredients.get(id) || 'Nguyên liệu #' + id) + '</span>').join('');
+  return ids.map(id => '<span class="ingredient-tag">' + esc(state.ingredients.get(id) || (id > 4294967296 ? 'Nguyên liệu chưa có trong danh mục User' : 'Nguyên liệu #' + id)) + '</span>').join('');
 }
 
 function renderRecommendations(items) {
@@ -319,52 +390,55 @@ function renderRecommendations(items) {
 }
 
 async function recommend(event, offset = 0) {
-  event.preventDefault();
-  if (state.busy || state.mode === 'recommend' && !state.available.size || !$('recommend-form').reportValidity()) return;
+  event?.preventDefault();
+  // Enter in recommendation mode follows the same debounce path.
+  if (event && state.mode === 'recommend') { scheduleRecommendation(); return; }
+  if (state.mode === 'recommend' && !state.available.size || !$('recommend-form').checkValidity()) return;
+  cancelRecommendation();
+  const version = state.requestVersion;
+  const controller = new AbortController();
+  state.controller = controller;
   state.offset = state.mode === 'search' ? offset : 0;
+  const mode = state.mode;
+  const signature = conditionSignature();
+  const isCurrent = () => version === state.requestVersion && signature === conditionSignature();
   state.busy = true;
   state.view = null;
-  $('ingredient-controls').disabled = true;
   $('recommend-button').disabled = true;
   $('loading').classList.remove('hidden');
   $('message').classList.add('hidden');
-  $('results').innerHTML = '';
-  $('result-count').textContent = '';
-  $('empty-state').classList.add('hidden');
   $('results-area').setAttribute('aria-busy', 'true');
   $('pagination').classList.add('hidden');
-  syncMode();
   saveSelection();
   try {
-    const body = state.mode === 'search' ? searchConditions() : {
-      ingredient_ids: [...state.available.keys()], excluded_ids: [...state.excluded.keys()],
-      top_k: Number($('top-k').value), algorithm: 'proposed'
-    };
-    if ($('max-minutes').value) body.max_minutes = Number($('max-minutes').value);
-    const response = await fetch(state.mode === 'search' ? '/api/search' : '/api/recommend', {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    const body = searchConditions();
+    const response = await fetch(mode === 'search' ? '/api/search' : '/api/recommend', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      signal: controller.signal
     });
     const envelope = await response.json();
-    if (!response.ok || !envelope.ok) throw Error(envelope.error?.code === 'UNKNOWN_OPERATION' && state.mode === 'search' ? 'TCP Server chưa hỗ trợ tìm kiếm. Hãy cập nhật server lên v1.2.' : envelope.error?.message || 'Không thể lấy kết quả. Hãy thử lại.');
-    const items = envelope.data.items;
+    if (!isCurrent()) return;
+    if (!response.ok || !envelope.ok) throw Error(envelope.error?.code === 'UNKNOWN_OPERATION' && mode === 'search' ? 'TCP Server chưa hỗ trợ tìm kiếm. Hãy cập nhật server lên v1.2.' : envelope.error?.message || 'Không thể lấy kết quả. Hãy thử lại.');
     state.view = {
-      kind: 'results', signature: conditionSignature(),
-      datasetVersion: envelope.data.dataset_version, items,
-      ...(state.mode === 'search' ? {total: envelope.data.total, limit: envelope.data.limit, offset: envelope.data.offset, has_more: envelope.data.has_more} : {})
+      kind: 'results', signature,
+      datasetVersion: envelope.data.dataset_version, items: envelope.data.items,
+      ...(mode === 'search' ? {total: envelope.data.total, limit: envelope.data.limit, offset: envelope.data.offset, has_more: envelope.data.has_more} : {})
     };
     if (!validCachedView(state.view)) throw Error('Dữ liệu gợi ý không hợp lệ hoặc đã thay đổi. Hãy tải lại trang và tìm lại.');
-    renderRecommendations(items);
+    renderRecommendations(state.view.items);
     saveSelection();
-    $('results-title').focus({preventScroll: true});
-    if (matchMedia('(max-width: 760px)').matches) $('results-area').scrollIntoView({block: 'start', behavior: 'auto'});
   } catch (error) {
-    showError(readableError(error));
+    if (isCurrent() && error.name !== 'AbortError') showError(readableError(error));
   } finally {
-    state.busy = false;
-    $('ingredient-controls').disabled = false;
-    render();
-    $('loading').classList.add('hidden');
-    $('results-area').setAttribute('aria-busy', 'false');
+    if (isCurrent()) {
+      state.busy = false;
+      state.controller = null;
+      // Keep selection DOM/focus intact when only results changed.
+      $('recommend-button').disabled = false;
+      $('selection-feedback').textContent = state.selectionNotice || (state.view?.kind === 'error' ? 'Lựa chọn được giữ lại. Đổi bộ lọc để thử lại.' : 'Đã cập nhật gợi ý theo nguyên liệu và bộ lọc.');
+      $('loading').classList.add('hidden');
+      $('results-area').setAttribute('aria-busy', 'false');
+    }
   }
 }
 
@@ -378,7 +452,6 @@ $('ingredient-results').addEventListener('click', event => {
 });
 for (const group of ['selected-ingredients', 'excluded-ingredients']) {
   $(group).addEventListener('click', event => {
-    if (state.busy) return;
     const move = event.target.closest('button[data-move]');
     const remove = event.target.closest('button[data-remove]');
     if (move) chooseIngredient(Number(move.dataset.move), move.dataset.destination);
@@ -389,27 +462,17 @@ for (const group of ['selected-ingredients', 'excluded-ingredients']) {
   });
 }
 $('clear-selection').onclick = () => {
-  if (state.busy) return;
   state.available.clear();
   state.excluded.clear();
   $('selection-feedback').textContent = 'Đã xóa lựa chọn. Bộ lọc thời gian và số món được giữ lại.';
   selectionChanged();
 };
 for (const id of ['max-minutes', 'top-k', 'recipe-query', 'max-missing', 'search-limit']) {
-  $(id).addEventListener('input', invalidateResults);
-}
-for (const mode of ['search', 'recommend']) {
-  $('mode-' + mode).onclick = () => {
-    if (state.busy || state.mode === mode) return;
-    state.mode = mode;
-    render();
-    invalidateResults();
-  };
+  $(id).addEventListener('input', selectionChanged);
 }
 $('page-prev').onclick = event => recommend(event, Math.max(0, state.offset - Number($('search-limit').value)));
 $('page-next').onclick = event => recommend(event, state.offset + Number($('search-limit').value));
 $('advanced-toggle').onclick = () => {
-  if (state.busy) return;
   state.advancedOpen = !state.advancedOpen;
   syncAdvanced();
   saveSelection();
@@ -422,7 +485,10 @@ $('ingredient-search').addEventListener('input', event => {
   timer = setTimeout(() => loadIngredients(event.target.value), 250);
 });
 $('recommend-form').addEventListener('submit', recommend);
-window.addEventListener('pagehide', saveSelection);
+window.addEventListener('pagehide', () => { saveSelection(); cancelRecommendation(); });
+window.addEventListener('pageshow', event => {
+  if (event.persisted && state.mode === 'recommend' && state.available.size && !state.view) scheduleRecommendation();
+});
 render();
 loadIngredients('', true);
 fetch('/api/health').then(response => {

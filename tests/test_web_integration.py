@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 import threading
 import time
@@ -9,9 +10,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from source.client.tcp_client import TCPClientError
+from source.common.protocol import error_response
 from source.database.seed import seed
 from source.server.main import TCPServer
 from source.web.main import app
+import source.web.main as web_main
 
 
 @pytest.fixture
@@ -59,11 +62,16 @@ def test_web_routes_use_real_tcp_server(web_with_tcp):
     detail = client.get("/api/recipes/1")
     assert detail.status_code == 200
     assert detail.json()["data"]["title"] == "Trứng sốt cà chua"
+    assert "Trứng sốt cà chua" in detail.content.decode("utf-8")
+    assert detail.json()["data"]["ingredients"][0]["name"] == "Trứng"
+    assert detail.json()["data"]["instructions"] == "Đánh trứng, nấu cùng cà chua."
 
     detail_page = client.get("/recipes/1")
     assert detail_page.status_code == 200
     assert 'data-recipe-id="1"' in detail_page.text
     assert "/static/detail.js" in detail_page.text
+    detail_script=(Path(__file__).resolve().parents[1]/"source/web/static/detail.js").read_text(encoding="utf-8")
+    assert "escapeHtml(data.title)" in detail_script
 
 
 def test_web_reports_tcp_outage_without_db_bypass(web_with_tcp):
@@ -71,9 +79,59 @@ def test_web_reports_tcp_outage_without_db_bypass(web_with_tcp):
     server.shutdown()
     thread.join(timeout=2)
     response = client.get("/api/health")
-    assert response.status_code == 503
+    assert response.status_code in {503, 504}
     assert response.json()["ok"] is False
-    assert response.json()["error"]["code"] == "UPSTREAM_UNAVAILABLE"
+    assert response.json()["error"]["code"] in {"UPSTREAM_UNAVAILABLE", "CONNECT_TIMEOUT"}
+
+
+def test_gateway_logs_transport_phase_and_preserves_request_id(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_main, "_GATEWAY_LOG_PATH", tmp_path / "TEST_ONLY-gateway.jsonl")
+
+    def disconnected(self, op, payload, request_id=None):
+        raise TCPClientError("UPSTREAM_DISCONNECTED", phase="receive")
+
+    monkeypatch.setattr(web_main.TCPClient, "request", disconnected)
+    with TestClient(app) as client:
+        response = client.get("/api/health")
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "UPSTREAM_DISCONNECTED"
+    assert "đóng kết nối" in response.json()["error"]["message"]
+    assert response.headers["x-request-id"] == response.json()["request_id"]
+    events = [json.loads(line) for line in (tmp_path / "TEST_ONLY-gateway.jsonl").read_text(encoding="utf-8").splitlines()]
+    tcp = next(event for event in events if event.get("layer") == "tcp_client")
+    assert tcp["request_id"] == response.headers["x-request-id"]
+    assert tcp["op"] == "PING" and tcp["phase"] == "receive"
+    assert tcp["error_code"] == "UPSTREAM_DISCONNECTED"
+    assert tcp["elapsed_ms"] >= 0
+
+
+def test_gateway_distinguishes_backend_error_from_transport_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_main, "_GATEWAY_LOG_PATH", tmp_path / "TEST_ONLY-gateway-backend.jsonl")
+
+    def mysql_error(self, op, payload, request_id=None):
+        return error_response(request_id, "DB_ERROR", "database operation failed")
+
+    monkeypatch.setattr(web_main.TCPClient, "request", mysql_error)
+    with TestClient(app) as client:
+        response = client.get("/api/health")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "DB_ERROR"
+    events = [json.loads(line) for line in (tmp_path / "TEST_ONLY-gateway-backend.jsonl").read_text(encoding="utf-8").splitlines()]
+    tcp = next(event for event in events if event.get("layer") == "tcp_client")
+    assert tcp["outcome"] == "backend_error" and tcp["error_code"] == "DB_ERROR"
+
+
+def test_recipe_conflict_is_http_409_not_tcp_unavailable(monkeypatch, tmp_path):
+    monkeypatch.setattr(web_main, "_GATEWAY_LOG_PATH", tmp_path / "TEST_ONLY-conflict-gateway.jsonl")
+
+    def conflict(self, op, payload, request_id=None):
+        return error_response(request_id, "ADMIN_RECIPE_CONFLICT", "TEST_ONLY conflict")
+
+    monkeypatch.setattr(web_main.TCPClient, "request", conflict)
+    with TestClient(app) as client:
+        response = client.get("/api/health")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "ADMIN_RECIPE_CONFLICT"
 
 
 def test_web_page_and_validation(web_with_tcp):
@@ -113,3 +171,16 @@ def test_web_maps_incomplete_or_timed_out_tcp_response(monkeypatch, code, status
     assert response.status_code == status
     assert response.json()["error"]["code"] == code
     assert response.json()["request_id"] == response.headers["x-request-id"]
+
+
+@pytest.mark.parametrize("code,status", [("UPSTREAM_UNAVAILABLE", 503), ("TIMEOUT", 504)])
+def test_recommend_reports_upstream_failure(monkeypatch, code, status):
+    def fail_request(*_args, **_kwargs):
+        raise TCPClientError(code)
+
+    monkeypatch.setattr("source.web.main.TCPClient.request", fail_request)
+    with TestClient(app) as client:
+        response = client.post("/api/recommend", json={"ingredient_ids": [1, 2], "top_k": 5})
+    assert response.status_code == status
+    assert response.json()["ok"] is False
+    assert response.json()["error"]["code"] == code

@@ -1,0 +1,981 @@
+{
+  "profile": "plant-only-v1",
+  "checked_on": "2026-11-05",
+  "scope": "All required/optional ingredients, instruction-only components and seasonings. Strict plant/mineral-only; no animal derivatives. Missing information is not certification.",
+  "approval": "No v2 source, revision, quantity or release is approved by this audit. No positive review is fabricated.",
+  "reviews": [
+    {
+      "recipe_id": 1,
+      "snapshot_sha256": "ae8d9b6a3c0afd6ab829770ef832e2cfa09a90ce679d1c6df55a445a97d7e384",
+      "animal_ingredient_ids": [
+        1
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Trứng sốt cà chua",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/1 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 2,
+      "snapshot_sha256": "1616a163dbe22934e47b169645c1b5d73597c398062768c1481ec9659e05c4f4",
+      "animal_ingredient_ids": [
+        1,
+        4
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt",
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Món thịt rau củ",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/2 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 3,
+      "snapshot_sha256": "21bd09aca3057766742514775ba7ae8ce42c2a650aa28fe25ddb17865abfb72f",
+      "animal_ingredient_ids": [
+        1
+      ],
+      "animal_instruction_terms": [
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Trứng xào hành",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/3 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 4,
+      "snapshot_sha256": "8dfdc32cc68899648930299935a5a641d3a7d3c3af458ca03167675b84e1a283",
+      "animal_ingredient_ids": [],
+      "animal_instruction_terms": [],
+      "status": "NEEDS_VERIFICATION",
+      "reasons": [
+        "Chưa xác minh đầy đủ gia vị, dầu/chế phẩm, thành phần tùy chọn và thành phần chỉ ghi trong hướng dẫn."
+      ],
+      "title": "Đậu phụ sốt cà chua",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/4 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 5,
+      "snapshot_sha256": "2e14ac13940964842217a4ec436f1911467b18f72e387c078ed995368584ea4f",
+      "animal_ingredient_ids": [],
+      "animal_instruction_terms": [],
+      "status": "NEEDS_VERIFICATION",
+      "reasons": [
+        "Chưa xác minh đầy đủ gia vị, dầu/chế phẩm, thành phần tùy chọn và thành phần chỉ ghi trong hướng dẫn."
+      ],
+      "title": "Rau muống xào tỏi",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/5 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 6,
+      "snapshot_sha256": "3a4f5579089435b5a7f2a68afc4b0d959aae289aa1c0a39f5c0a5cda0381e1fa",
+      "animal_ingredient_ids": [
+        14
+      ],
+      "animal_instruction_terms": [
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Canh gà nấm hương",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/6 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 7,
+      "snapshot_sha256": "26d3fa08d96ee43ba718347a62b03ab1412f8cd77adbe1ab278c13aae6af97da",
+      "animal_ingredient_ids": [
+        13
+      ],
+      "animal_instruction_terms": [
+        "cá",
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Cá basa kho gừng",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/7 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 8,
+      "snapshot_sha256": "4a8207051915a5c916ae6a750c6f5e3967e3bfe193f8449fa98db72de4dd3472",
+      "animal_ingredient_ids": [
+        4
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bún thịt xào",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/8 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 9,
+      "snapshot_sha256": "1fd510a76c9235302e1b9e4f27ab593abcc4dc2ba271f3cc0aaf87f2f0cde1d0",
+      "animal_ingredient_ids": [],
+      "animal_instruction_terms": [],
+      "status": "NEEDS_VERIFICATION",
+      "reasons": [
+        "Chưa xác minh đầy đủ gia vị, dầu/chế phẩm, thành phần tùy chọn và thành phần chỉ ghi trong hướng dẫn."
+      ],
+      "title": "Khoai tây xào cà rốt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/9 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 10,
+      "snapshot_sha256": "ff6849df2e5e435dbe75e89ca7d65f2042dbfd071a9b0c8716a52b928cd1dbef",
+      "animal_ingredient_ids": [
+        1
+      ],
+      "animal_instruction_terms": [
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Trứng cuộn rau củ",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/10 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 11,
+      "snapshot_sha256": "c711c4e60093bc578f3cd2bf84f8dd5dc39c03efd7b53bd2a77df56e9721b416",
+      "animal_ingredient_ids": [
+        37
+      ],
+      "animal_instruction_terms": [
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Phở bò",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/11 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 12,
+      "snapshot_sha256": "8d83d1f7723b04d5c6e9459df41a854fbebf9c0a78d7a239357ca06bcdd6cc60",
+      "animal_ingredient_ids": [
+        14
+      ],
+      "animal_instruction_terms": [
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Phở gà",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/12 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 13,
+      "snapshot_sha256": "bebcab48d90fec02c348f94303dc9d717dd3ae57a1969db4ac305312acf77957",
+      "animal_ingredient_ids": [
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bún chả",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/13 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 14,
+      "snapshot_sha256": "39ef41d545dc0fc4957c22cb3939a9a5b9c950837204052d08d3b9b9537bb37b",
+      "animal_ingredient_ids": [
+        26,
+        37
+      ],
+      "animal_instruction_terms": [
+        "mắm ruốc",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bún bò Huế",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/14 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 15,
+      "snapshot_sha256": "741724ddd81b6044a5ed860afd7fe1ce9458049a4b2053a4222b91f419979646",
+      "animal_ingredient_ids": [
+        24,
+        28
+      ],
+      "animal_instruction_terms": [
+        "cua",
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bún riêu cua",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/15 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 16,
+      "snapshot_sha256": "4921582e1362c3626fc48c947e96feee764cd09fa46af52e14d24b1169b15352",
+      "animal_ingredient_ids": [
+        35,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt",
+        "tôm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Gỏi cuốn tôm thịt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/16 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 17,
+      "snapshot_sha256": "897e9c5df56c29b48a3b13bc1722948c03d356642cebba02709bd6954f893a0d",
+      "animal_ingredient_ids": [
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Chả giò",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/17 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 18,
+      "snapshot_sha256": "bc542bcb4342f17df0c635cb764e1423578648e8eb98133238e726d008721774",
+      "animal_ingredient_ids": [
+        24,
+        35,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt",
+        "tôm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bánh xèo",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/18 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 19,
+      "snapshot_sha256": "96429b8960a039279d5540c7bcac712c708e6a319fcc0299d21ba1f6fa3cc457",
+      "animal_ingredient_ids": [
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bánh cuốn nhân thịt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/19 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 20,
+      "snapshot_sha256": "f459f34065e02c383abde936fe3dd399fef11a15549ce8d8b936f7753938dc8d",
+      "animal_ingredient_ids": [
+        4,
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Cao lầu Hội An",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/20 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 21,
+      "snapshot_sha256": "d453a869cf6336f031e77bebea0b0b7a5ec5654f0d09972fc269196fb07a82a0",
+      "animal_ingredient_ids": [
+        24,
+        35,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt",
+        "tôm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Mì Quảng tôm thịt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/21 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 22,
+      "snapshot_sha256": "24c02276f4afd7afee1c7f595703a30ad036eabbc5f2172dd4a17396b205d9c4",
+      "animal_ingredient_ids": [
+        24,
+        39
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "sườn"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Cơm tấm sườn",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/22 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 23,
+      "snapshot_sha256": "30eb85731210df7c4dbc6e7d54b2887043492adb30305e9fe95c2ded1e35fb81",
+      "animal_ingredient_ids": [
+        14,
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Cơm gà xối mỡ",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/23 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 24,
+      "snapshot_sha256": "4abcd6ef752c4a111cdae4cbeca8f4176b8894f88622bc2347cec1330b6f7cb1",
+      "animal_ingredient_ids": [
+        1,
+        14
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt",
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Cơm chiên Dương Châu",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/24 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 25,
+      "snapshot_sha256": "083a74b1448c5f93781233122f6f7d6f00d3f292becc674ffaf4ec79430a186e",
+      "animal_ingredient_ids": [
+        1,
+        13,
+        24
+      ],
+      "animal_instruction_terms": [
+        "cá",
+        "nước mắm",
+        "thịt",
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Cơm chiên cá mặn",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/25 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 26,
+      "snapshot_sha256": "981dfe709709128d3fa6fd8eeaf2b487fef7dd3aa10127d3f312f4fa3e45ab40",
+      "animal_ingredient_ids": [
+        13,
+        24
+      ],
+      "animal_instruction_terms": [
+        "cá",
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Cá kho tộ",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/26 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 27,
+      "snapshot_sha256": "d65766d6e3d2247b5e5a1130531044ce1f7fde25349fae4d0120a24474957d4d",
+      "animal_ingredient_ids": [
+        1,
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt",
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Thịt kho trứng",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/27 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 28,
+      "snapshot_sha256": "d00dcd569a1caa443b4e8d59ef01ae13d234c3ece8e2dc8b6c9a846dbf65137d",
+      "animal_ingredient_ids": [
+        13,
+        24
+      ],
+      "animal_instruction_terms": [
+        "cá",
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Canh chua cá",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/28 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 29,
+      "snapshot_sha256": "5e141864fa4e56d2b37b2b2cf3b50a8170c0f07a9e6e500e882ffcaa4e2a766c",
+      "animal_ingredient_ids": [
+        24,
+        39
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "sườn"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Canh bí đỏ hầm xương",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/29 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 30,
+      "snapshot_sha256": "2940a989a13a1270afa935e44acf3270d967a40146f7e08e0b52899a4ee5ca7a",
+      "animal_ingredient_ids": [
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Canh rau ngót thịt bằm",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/30 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 31,
+      "snapshot_sha256": "067c81035b3508b54f6d99eba15915e57558ba0bec63fa464d100f32bd3fbb2f",
+      "animal_ingredient_ids": [
+        24,
+        39
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "sườn"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Canh cải chua sườn",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/31 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 32,
+      "snapshot_sha256": "1ffb2c24eb38e140ff3bccd87bd1cf77dbdd760735b8c023258f2402283a9f0f",
+      "animal_ingredient_ids": [
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Canh nấm rơm đậu phụ",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/32 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 33,
+      "snapshot_sha256": "950a048aa17ce0ff3db1cbd367a00f9bd9b5bf50c8f33250996ffbc664181c89",
+      "animal_ingredient_ids": [
+        14,
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Gà kho gừng",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/33 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 34,
+      "snapshot_sha256": "8bc1a9e774cb96f886838ae142b58ef628f064fd37fe78e92c13209322d998fc",
+      "animal_ingredient_ids": [
+        14,
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Gà xào sả ớt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/34 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 35,
+      "snapshot_sha256": "b86a619dd06c4ebd17c52c20aeee70b5ba609b4e64761ab02c44e5dee648e25a",
+      "animal_ingredient_ids": [
+        24,
+        37
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bò lúc lắc",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/35 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 36,
+      "snapshot_sha256": "00ac229cd4dd542237b61cfd331cf8cddd150d70fff86ef942f9403fb3c71b7d",
+      "animal_ingredient_ids": [
+        24,
+        37
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bò xào rau muống",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/36 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 37,
+      "snapshot_sha256": "5531fedbe9a40020d0559b64990f09c4519161285ab6251b9484b7d4e9c5d913",
+      "animal_ingredient_ids": [
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Thịt heo kho tiêu",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/37 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 38,
+      "snapshot_sha256": "12c8efa37b7ec8262dc24064f56bcb67a34b676e88f432354282898a86f4ac3e",
+      "animal_ingredient_ids": [
+        1,
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt",
+        "trứng"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Thịt băm chưng trứng",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/38 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 39,
+      "snapshot_sha256": "b4421882b6800edc769c2c06abaaa28c98d045e36d068611ba47d8d7f1c9830d",
+      "animal_ingredient_ids": [
+        24,
+        39
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "sườn"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Sườn xào chua ngọt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/39 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 40,
+      "snapshot_sha256": "78a0ba2b11fbfd4d76dd7f92d5b6407cccd8e03d14648f0b50294d118dbaa227",
+      "animal_ingredient_ids": [
+        24,
+        35
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "tôm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Tôm rang me",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/40 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 41,
+      "snapshot_sha256": "2340818787d7cd675f80f6c4b94b4622a60cb4ba47a374b4d0a489171efa9cfa",
+      "animal_ingredient_ids": [
+        24,
+        36
+      ],
+      "animal_instruction_terms": [
+        "mực",
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Mực xào dứa",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/41 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 42,
+      "snapshot_sha256": "f87bc470102571df0f273fcd79316bb644aa5255ca47a13d785e2375c07369e9",
+      "animal_ingredient_ids": [
+        35
+      ],
+      "animal_instruction_terms": [
+        "tôm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Tôm hấp nước dừa",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/42 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 43,
+      "snapshot_sha256": "d56c01501a66a085b60c43ee871c53b5e563bfb6c87986f1630a62a178d83451",
+      "animal_ingredient_ids": [
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Đậu phụ nhồi thịt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/43 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 44,
+      "snapshot_sha256": "7fdca4f59e05d318306aff63851a98b948cd111061b0a8fd2fe38f3ff727e09f",
+      "animal_ingredient_ids": [
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Đậu phụ kho nấm",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/44 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 45,
+      "snapshot_sha256": "ea23533cfb6c839642c60356e4d3c99c0570d594c12f4e02a94d96024f7e467b",
+      "animal_ingredient_ids": [
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Nấm xào sả",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/45 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 46,
+      "snapshot_sha256": "10b5f7f91d1bdaa55ec4820f9531f4f7c3dd7a7772bdc716ae7f7ae7ec04515e",
+      "animal_ingredient_ids": [
+        14,
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Gỏi gà rau răm",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/46 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 47,
+      "snapshot_sha256": "77d6c4e16afc2eefde00dcc46d358a848f5b7ee3260cff38088582832d565c1c",
+      "animal_ingredient_ids": [
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Nộm dưa leo cà rốt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/47 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 48,
+      "snapshot_sha256": "5a1e55082bfb393b6889fc526eb2dde3b766b3045451479278638bdc9dc740e5",
+      "animal_ingredient_ids": [
+        4,
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Bánh tráng cuốn thịt heo",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/48 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 49,
+      "snapshot_sha256": "fb2d56074a38c07985bf9b9da57679aad8dbe51eba19a7ddc78d5d48f0a027a4",
+      "animal_ingredient_ids": [
+        24,
+        38
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Chả lá lốt",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/49 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    },
+    {
+      "recipe_id": 50,
+      "snapshot_sha256": "b3ec1cadc20a396dc35380f9312f2f76d1e6a8ec9b7af3e57c5f99e77907ab32",
+      "animal_ingredient_ids": [
+        14,
+        24
+      ],
+      "animal_instruction_terms": [
+        "nước mắm",
+        "thịt"
+      ],
+      "status": "INCOMPATIBLE",
+      "reasons": [
+        "Có thành phần động vật hoặc nước mắm thông thường trong nguyên liệu/hướng dẫn; kể cả thành phần tùy chọn."
+      ],
+      "title": "Miến gà",
+      "profile": "plant-only-v1",
+      "evidence_ref": "legacy:recipes/50 + recipe_ingredients; current MySQL read-only snapshot 2026-11-05",
+      "reviewer_ref": null
+    }
+  ]
+}

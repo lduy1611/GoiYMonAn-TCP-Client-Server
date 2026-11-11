@@ -1,5 +1,6 @@
 const detailRoot = document.getElementById('detail');
-const returnTo = ['/', '/meal-plan'].includes(detailRoot.dataset.returnTo) ? detailRoot.dataset.returnTo : '/';
+const validRecipeID = value => Number.isSafeInteger(value) && (value >= 1 && value <= 4294967295 || value > 4294967296 && value <= 8589934591);
+const returnTo = ['/', '/meal-plan', '/meal-plan/v1'].includes(detailRoot.dataset.returnTo) ? detailRoot.dataset.returnTo : '/';
 const escapeHtml = value => {
   const node = document.createElement('div');
   node.textContent = String(value ?? '');
@@ -33,12 +34,28 @@ function renderRecipe(data) {
     '</ul></section><section class="recipe-instructions" aria-labelledby="instructions-title"><h2 id="instructions-title">Các bước chế biến</h2><p class="field-help">Hướng dẫn từ công thức được lưu trong hệ thống.</p>' + stepsHtml + '</section></div>' +
     '<p class="source">' + sourceMarkup(data.source_url) + '</p>';
   window.RecipeImages?.mount(detailRoot);
+  mountAchievementForm(data.id);
+}
+
+function mountAchievementForm(recipeId) {
+  const section=document.createElement('section');section.id='achievement-form';section.className='achievement-submit-section panel';
+  section.innerHTML='<div class="achievement-submit-heading"><p class="eyebrow">CHIA SẺ CÙNG CỘNG ĐỒNG</p><h2>Thành quả</h2><p>Chia sẻ món bạn đã nấu theo công thức này.</p></div><form id="achievement-submit-form"><label for="achievement-photos">Ảnh thành quả <span>(chọn 1–3 ảnh)</span></label><input id="achievement-photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required><div id="achievement-photo-preview" class="achievement-photo-preview"></div><label for="achievement-description">Mô tả</label><textarea id="achievement-description" name="description" maxlength="3000" rows="4" required placeholder="Chia sẻ đôi điều về món bạn vừa nấu…"></textarea><label for="achievement-changed">Bạn đã thay đổi nguyên liệu gì? <span>(không bắt buộc)</span></label><input id="achievement-changed" name="changed_ingredients" maxlength="1000" placeholder="Ví dụ: thay thịt bò bằng thịt gà"><p id="achievement-submit-status" role="status" aria-live="polite"></p><button id="achievement-submit-button" type="submit">Đăng thành quả</button></form>';
+  detailRoot.after(section);
+  const form=section.querySelector('form'),photos=section.querySelector('#achievement-photos'),preview=section.querySelector('#achievement-photo-preview'),status=section.querySelector('#achievement-submit-status'),button=section.querySelector('button');
+  let user=null,requestKey=crypto.randomUUID();
+  fetch('/api/auth/session',{credentials:'same-origin',cache:'no-store'}).then(r=>r.json()).then(envelope=>{if(envelope.ok&&envelope.data?.authenticated)user=envelope.data;}).catch(()=>{});
+  photos.addEventListener('change',()=>{preview.replaceChildren();const files=[...(photos.files||[])];if(files.length>3){photos.value='';status.textContent='Chọn tối đa 3 ảnh.';status.className='error';return;}for(const file of files){const image=document.createElement('img');image.alt='Ảnh xem trước';image.src=URL.createObjectURL(file);preview.append(image);}});
+  const readBase64=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',',2)[1]||'');reader.onerror=()=>reject(new Error('Không đọc được ảnh đã chọn.'));reader.readAsDataURL(file);});
+  form.addEventListener('submit',async event=>{event.preventDefault();const files=[...(photos.files||[])];if(!user){location.assign('/account/login?next='+encodeURIComponent(location.pathname+'#achievement-form'));return;}if(files.length<1||files.length>3){status.textContent='Chọn từ 1 đến 3 ảnh.';status.className='error';return;}if(files.some(file=>file.size>5*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type))){status.textContent='Mỗi ảnh cần là JPG, PNG hoặc WebP và không quá 5 MB.';status.className='error';return;}button.disabled=true;status.textContent='Đang đăng thành quả…';status.className='';
+    try{const images=[];for(const file of files)images.push({media_type:file.type,data_base64:await readBase64(file)});const response=await fetch('/api/achievements',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':user.csrf_token},body:JSON.stringify({recipe_id:Number(recipeId),description:form.elements.description.value,changed_ingredients:form.elements.changed_ingredients.value,request_key:requestKey,images})});const envelope=await response.json();if(!response.ok||envelope.ok!==true){const err=new Error(envelope.error?.message||'Không đăng được thành quả.');err.code=envelope.error?.code;throw err;}const url=envelope.data?.url||('/achievements?post_id='+encodeURIComponent(envelope.data.post_id));status.textContent='Đăng thành quả thành công. ';const link=document.createElement('a');link.href=url;link.textContent='Xem bài vừa đăng';status.append(link);form.reset();preview.replaceChildren();requestKey=crypto.randomUUID();
+    }catch(error){if(error.status===401||error.code==='USER_UNAUTHORIZED'){location.assign('/account/login?next='+encodeURIComponent(location.pathname+'#achievement-form'));return;}status.textContent=error.message||'Không đăng được thành quả.';status.className='error';}finally{button.disabled=false;}
+  });
 }
 
 async function loadRecipe() {
   detailRoot.setAttribute('aria-busy', 'true');
   try {
-    if (!Number.isSafeInteger(Number(detailRoot.dataset.recipeId)) || Number(detailRoot.dataset.recipeId) <= 0) throw Error('Đường dẫn công thức không hợp lệ. Hãy quay lại để chọn món.');
+    if (!validRecipeID(Number(detailRoot.dataset.recipeId))) throw Error('Đường dẫn công thức không hợp lệ. Hãy quay lại để chọn món.');
     const response = await fetch('/api/recipes/' + detailRoot.dataset.recipeId);
     const envelope = await response.json();
     if (!response.ok || !envelope.ok) throw Error(envelope.error?.message || 'Không tải được công thức.');

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ page_title }}</title><link rel="stylesheet" href="/static/admin.css"></head>
+<body class="admin-body"><main class="admin-login-card">
+  <a class="admin-back" href="/">← Hôm nay ăn gì?</a><p class="admin-eyebrow">KHU VỰC QUẢN TRỊ</p>
+  <h1>Đăng nhập Admin</h1><p class="admin-muted">Dùng tài khoản quản trị do máy chủ cấu hình.</p>
+  <form id="admin-login-form"><label>Tên đăng nhập<input name="username" autocomplete="username" required maxlength="100"></label>
+    <label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+    <button id="admin-login-submit" type="submit">Đăng nhập</button></form>
+  <p id="admin-login-message" class="admin-message" role="status" aria-live="polite"></p>
+</main><script src="/static/admin-login.js?v=admin-reauth-20261108" defer></script></body></html>

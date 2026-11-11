@@ -1,6 +1,0 @@
-{
-  "dataset_version": "fixture-v1",
-  "provenance": "Tự biên soạn cho đồ án, không scrape và không dùng cho tư vấn y tế.",
-  "source_url": null,
-  "purpose": "Demo và kiểm thử chức năng TCP/Web; không phải tập đánh giá chất lượng thuật toán."
-}

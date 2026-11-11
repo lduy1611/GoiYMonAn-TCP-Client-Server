@@ -9,7 +9,11 @@ from source.common.protocol import CLIENT_TOTAL_BUDGET, ProtocolError, encode_fr
 
 
 class TCPClientError(Exception):
-    pass
+    def __init__(self, code: str, *, phase: str | None = None, os_error: int | None = None):
+        super().__init__(code)
+        self.code = code
+        self.phase = phase
+        self.os_error = os_error
 
 
 class TCPClient:
@@ -23,23 +27,38 @@ class TCPClient:
         frame = encode_frame(request)
         started = time.monotonic()
         sock = self.sock
+        phase = "connect"
         try:
             if sock is None:
-                sock = socket.create_connection((self.host, self.port), timeout=min(1.0, CLIENT_TOTAL_BUDGET))
+                try:
+                    sock = socket.create_connection((self.host, self.port), timeout=min(1.0, CLIENT_TOTAL_BUDGET))
+                except (socket.timeout, TimeoutError) as exc:
+                    raise TCPClientError("CONNECT_TIMEOUT", phase="connect") from exc
+                except OSError as exc:
+                    raise TCPClientError("UPSTREAM_UNAVAILABLE", phase="connect", os_error=getattr(exc, "errno", None)) from exc
                 if self.persistent:
                     self.sock = sock
             sock.settimeout(min(5.0, max(0.001, CLIENT_TOTAL_BUDGET - (time.monotonic() - started))))
+            phase = "send"
             sock.sendall(frame)
+            phase = "receive"
             response, _ = recv_frame(sock, timeout=min(5.0, max(0.001, CLIENT_TOTAL_BUDGET - (time.monotonic() - started))))
-            if response is None or response.get("request_id") != request_id:
-                raise TCPClientError("UPSTREAM_PROTOCOL")
+            if response is None:
+                raise TCPClientError("UPSTREAM_DISCONNECTED", phase="receive")
+            if response.get("request_id") != request_id:
+                raise TCPClientError("UPSTREAM_PROTOCOL", phase="receive")
             return response
-        except (OSError, TimeoutError) as exc:
+        except (socket.timeout, TimeoutError) as exc:
             self.close()
-            raise TCPClientError("UPSTREAM_UNAVAILABLE") from exc
+            code = "CONNECT_TIMEOUT" if phase == "connect" else "TIMEOUT"
+            raise TCPClientError(code, phase=phase) from exc
+        except OSError as exc:
+            self.close()
+            code = "UPSTREAM_UNAVAILABLE" if phase == "connect" else "UPSTREAM_DISCONNECTED"
+            raise TCPClientError(code, phase=phase, os_error=getattr(exc, "errno", None)) from exc
         except ProtocolError as exc:
             self.close()
-            raise TCPClientError(exc.code) from exc
+            raise TCPClientError(exc.code, phase=phase) from exc
         except TCPClientError:
             self.close()
             raise

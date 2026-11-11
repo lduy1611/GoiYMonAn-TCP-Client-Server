@@ -56,7 +56,9 @@ class MealItem(Contract):
 
 class ShoppingUse(Contract):
     recipe_id: PositiveID
-    quantity: StrictStr = Field(max_length=255)
+    # A recipe can intentionally have an unquantified ingredient. Preserve
+    # that absence as null instead of inventing a shopping amount.
+    quantity: StrictStr | None = Field(max_length=255)
     is_required: bool
 
 
