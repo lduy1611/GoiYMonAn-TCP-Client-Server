@@ -100,7 +100,7 @@ try {
   const navigate = async path => {
     const previousDocument = await evaluate('performance.timeOrigin');
     await send('Page.navigate', {url: baseUrl + path});
-    await wait('performance.timeOrigin !== ' + previousDocument + ' && document.readyState === "complete" && location.pathname === ' + JSON.stringify(new URL(path, location.origin).pathname) + ' && location.search === ' + JSON.stringify(new URL(path, location.origin).search));
+    await wait('performance.timeOrigin !== ' + previousDocument + ' && document.readyState === "complete" && location.pathname === ' + JSON.stringify(new URL(path, baseUrl).pathname) + ' && location.search === ' + JSON.stringify(new URL(path, baseUrl).search));
   };
   const settleRecommendations = async () => {
     await pause(400);
@@ -150,6 +150,12 @@ try {
     const catalog = await evaluate('window.RecipeImages.ready()');
     const selector = detail ? '#detail .recipe-photo' : '.recipe-card .recipe-photo';
     await wait('document.querySelectorAll(' + JSON.stringify(selector) + ').length > 0');
+    // mount also waits for the per-recipe uploaded-image request. Catalog
+    // readiness alone does not mean that the initial placeholder was replaced.
+    await wait(`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).every(image=>{
+      const entry=${JSON.stringify(catalog)}.recipes[String(image.dataset.recipeId)];
+      return !entry||entry.is_placeholder!==false||image.getAttribute('src')===entry.image_path;
+    })`);
     const photos = await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)}), image => ({
       id: Number(image.dataset.recipeId), path: image.getAttribute('src'), alt: image.alt, loading: image.loading,
       placeholder: image.dataset.placeholder, width: image.width, height: image.height,
@@ -164,7 +170,7 @@ try {
       const entry = catalog.recipes[String(photo.id)];
       const real = entry?.is_placeholder === false;
       assert.equal(photo.path, real ? entry.image_path : '/static/images/recipes/placeholder.svg');
-      assert.equal(photo.placeholder, real ? 'false' : 'page');
+      assert.equal(photo.placeholder, real ? 'false' : 'true');
       assert.ok(photo.alt.trim().length > 0);
       assert.ok(photo.path.startsWith('/static/images/recipes/'), 'Never hotlink images');
       assert.equal(photo.loading, detail ? 'eager' : 'lazy');
@@ -320,9 +326,9 @@ try {
   await wait('document.querySelectorAll("[data-select]").length > 0');
   const assetVersions = await evaluate(`[
     document.querySelector('link[rel=stylesheet]').href,
-    document.querySelector('script[src]').src
+    document.querySelector('script[src*="/static/app.js"]').src
   ].map(url => new URL(url).searchParams.get('v'))`);
-  assert.ok(assetVersions[0] && assetVersions[0] === assetVersions[1], 'CSS and JS must share a release version');
+  assert.deepEqual(assetVersions,['feedback-widget-20261111','user-shell-restore-20261113'],'Each independent asset has its own cache-busting release');
   await send('Fetch.disable');
   legacyCss = null;
   await send('Network.setCacheDisabled', {cacheDisabled: false});
@@ -338,7 +344,7 @@ try {
   assert.equal(await evaluate('document.activeElement.dataset.select'), '1');
   await key(' ', 'Space', 32);
   assert.equal(await evaluate('document.getElementById("selected-count").textContent'), '1/30');
-  assert.equal(await evaluate('document.activeElement.getAttribute("aria-pressed")'), 'page');
+  assert.equal(await evaluate('document.activeElement.getAttribute("aria-pressed")'), 'true');
   await click('[data-select="1"]');
   await key('Tab', 'Tab', 9);
   assert.equal(await evaluate('document.activeElement.dataset.exclude'), '1');
@@ -417,7 +423,16 @@ try {
     const {identifier} = await send('Page.addScriptToEvaluateOnNewDocument', {
       source: 'sessionStorage.setItem("goiy-selection-v1", ' + JSON.stringify(snapshot) + ')'
     });
-    try { await reloadHome(); }
+    try {
+      // A saved Explore state must be restored in Explore, not injected into
+      // an explicit Fridge URL whose entry preset intentionally chooses pantry.
+      let context;try{context=JSON.parse(snapshot).entryView;}catch{}
+      const currentContext=await evaluate("new URLSearchParams(location.search).get('view')");
+      if(context!==undefined&&context!==currentContext){
+        await navigate(context===null?'/':'/?view='+encodeURIComponent(context));
+        await wait('document.getElementById("ingredient-results")?.getAttribute("aria-busy")==="false"');
+      }else await reloadHome();
+    }
     finally { await send('Page.removeScriptToEvaluateOnNewDocument', {identifier}); }
   };
   const beforeReloadPosts = posts.length;
@@ -430,13 +445,23 @@ try {
     `saved.view.signature = 'different-conditions'; return JSON.stringify(saved);`,
     `saved.conditions.maxMinutes = '1'; return JSON.stringify(saved);`,
     `saved.view.datasetVersion = 'different-dataset'; return JSON.stringify(saved);`,
-    `saved.view.items = [{recipe_id:1}]; return JSON.stringify(saved);`,
-    `saved.conditions.available.push(999999); return JSON.stringify(saved);`
+    `saved.view.items = [{recipe_id:1}]; return JSON.stringify(saved);`
   ]) {
     const damaged = Function('saved', mutate)(JSON.parse(validSnapshot));
     await reloadWithSnapshot(damaged);
     assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0, 'Invalid or mismatched cache must not render stale results: ' + mutate);
     assert.equal(await evaluate('document.getElementById("ingredient-controls").disabled'), false);
+  }
+  // Retired IDs are sanitized, not substituted. A result for the unchanged
+  // remaining conditions is still valid; the User sees an explicit notice.
+  for(const group of ['available','excluded']){
+    const retired=JSON.parse(validSnapshot);retired.conditions[group].push(999999);
+    await reloadWithSnapshot(JSON.stringify(retired));
+    const cleaned=await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1"))');
+    assert.deepEqual(cleaned.conditions[group],JSON.parse(validSnapshot).conditions[group]);
+    assert.ok((await evaluate('document.getElementById("selection-feedback").textContent')).includes('Đã bỏ 1'));
+    assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'),savedTitles);
+    assert.equal(await evaluate(`document.querySelectorAll('[data-select="999999"],[data-exclude="999999"]').length`),0);
   }
   await reloadWithSnapshot(validSnapshot);
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'), savedTitles);
@@ -554,13 +579,13 @@ try {
   await input('search-limit', '1');
   const beforeDisclosureRequests = apiRequests.length;
   await click('#advanced-toggle');
-  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'page');
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true');
   assert.notEqual(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
   await key('Enter', 'Enter', 13);
   assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false');
   await send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
   await key(' ', 'Space', 32);
-  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'page');
+  assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'true');
   assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).animationDuration'), '0s');
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".advanced-chevron")).transitionDuration'), '0s');
   await send('Emulation.setEmulatedMedia', {features: []});

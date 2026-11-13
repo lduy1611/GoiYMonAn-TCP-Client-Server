@@ -44,6 +44,10 @@ class AdminIngredientConflict(RuntimeError):
     pass
 
 
+class AdminTaxonomyConflict(RuntimeError):
+    pass
+
+
 class AdminIngredientSchemaUnavailable(RuntimeError):
     pass
 

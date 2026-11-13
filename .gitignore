@@ -1,30 +1,70 @@
+# Thong tin bao mat
 .env
 .env.*
 !.env.example
+!.env.demo.example
+*.pem
+*.key
+
+# Python
 .venv/
 __pycache__/
-*.py[cod]
+*.pyc
 .pytest_cache/
 /.pytest_*/
 /._pytest_*/
 /.testtmp_*/
 /.test_runtime/
-/.tmp_admin_*_test_*/
-*.log
-*.log.*
-*.jsonl
+# Local backups can contain accounts, hashes, sessions and private records.
+/backups/
+# Evidence and image generation originals remain local. Publish reviewed runtime
+# copies under data/demo/ instead of exposing this entire working directory.
+/output/
+/.tmp_admin_write_test_*/
+/.tmp_admin_writer_test_*/
+
+# File database va log runtime
 *.db
-*.sqlite
 *.sqlite3
-*.sqlite-wal
-*.sqlite-shm
-*.pem
-*.key
-*.p12
-*.pfx
+*.log
 statics/runtime/
-statics/results/
+statics/results/tcp_server.jsonl
+
+# Tai lieu dong goi
+BAO_CAO_TAI_LIEU/
+BAO_CAO_TAI_LIEU.zip
+
+# File tam
 .vscode/
 .DS_Store
+.env.admin.local
+
+# Additional local environments and tooling caches
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.pyo
+*.tmp
+*.bak
+*.orig
+Thumbs.db
+
+# Main's previous 201-recipe package is superseded by data/demo/.
+# Preserve existing local copies, including in the integration worktree.
+/statics/demo/
+/source/database/unified_v3_demo_seed.sql
+
+# Compatible exclusions retained from main
+*.log.*
+*.jsonl
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.p12
+*.pfx
 playwright-report/
 test-results/

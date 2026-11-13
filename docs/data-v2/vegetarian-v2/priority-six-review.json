@@ -1,0 +1,3032 @@
+{
+  "format": "vegetarian-priority-six-review-1",
+  "reviewed_sources_on": "2026-11-05",
+  "timezone": "Asia/Saigon",
+  "purpose": "Decision preparation only; no approval, import, SQL or release activation.",
+  "publication_allowed": false,
+  "database_audit": "statics/runtime/vegetarian-review-20261105/audit.json",
+  "audit_result": {
+    "database": "goiy_mon_an",
+    "evidence_count": 75,
+    "evidence_scopes": {
+      "role": 6,
+      "recipe_content": 6,
+      "servings": 6,
+      "quantity": 50,
+      "diet": 6,
+      "import_manifest": 1
+    },
+    "dossier_matches_database": true,
+    "all_evidence_payload_hashes_valid": true,
+    "current_verified_vegetarian_count": 0,
+    "legacy_unchanged_against_preimport": true,
+    "all_database_tables_unchanged_during_review": true
+  },
+  "source_access_note": "Recipe pages reopened directly; the web extraction may be cached. No origin HTML hash or exact origin fetch time is asserted. URLs/sections identify observations, not approval.",
+  "source_content_hash_required_for_current_adapter": false,
+  "runtime_eligible_count": 0,
+  "unconditionally_ready_for_full_revision_and_portion_approval": 0,
+  "priority_conditional_content_review_keys": [
+    "V02",
+    "V12"
+  ],
+  "all_six_source_cards_rechecked": true,
+  "shared_required_gaps": {
+    "source": [
+      "verification_status remains NEEDS_VERIFICATION; accessed_at is NULL. Record an honest reviewer observation and decide source verification.",
+      "Recipe sources are external; the seventh source is an internal import manifest, not independent recipe evidence."
+    ],
+    "revision": [
+      "status remains NEEDS_VERIFICATION; content_complete=0; content_review_id and servings_review_id are NULL.",
+      "role and diet are unapproved evidence only; neither the revision flag nor source vegan wording alone certifies the dish."
+    ],
+    "every_ingredient_line": [
+      "status NEEDS_VERIFICATION; quantity_review_id NULL; measurement_basis unknown; form_id NULL.",
+      "scaling_mode, scaling_evidence_set_id and scaling_review_id NULL. No implicit linear scaling."
+    ],
+    "all_33_new_ingredient_identities": [
+      "identity_status NEEDS_VERIFICATION; evidence_set_id and review_decision_id NULL; no verified legacy mapping."
+    ],
+    "all_10_new_units": [
+      "status NEEDS_VERIFICATION; evidence_set_id and review_decision_id NULL; no approved unit conversions."
+    ],
+    "portion_only": [
+      "No approved ingredient forms; no portion allocation policy or release. Content/diet review must be distinguished from complete quantity calculation."
+    ]
+  },
+  "integration_findings": [
+    {
+      "code": "LEGACY_ONLY_CANDIDATE_CATALOG",
+      "status": "BLOCKING",
+      "locations": [
+        "source/server/repository.py:recipes_for_ranking",
+        "source/server/repository.py:get_recipe",
+        "source/server/repository.py:recipe_ids_exist"
+      ],
+      "finding": "Only the 50 legacy recipe IDs are read; new source recipe IDs return NOT_FOUND for detail/calculation.",
+      "required_change": "A separately release-gated v2 view for meal-plan-v2 candidates, recipe detail, ingredient identities and ID validation. Keep legacy operations behavior intact."
+    },
+    {
+      "code": "LEGACY_ONLY_ROLE_AND_DIET_CATALOG",
+      "status": "BLOCKING",
+      "locations": [
+        "source/server/meal_plan.py:load_classification",
+        "source/server/meal_preferences.py:load",
+        "source/server/vegetarian.py:read_reviews"
+      ],
+      "finding": "Role catalog requires IDs 1..50; diet certification uses legacy snapshots. Imported role/diet observations have no reviewed publication reader.",
+      "required_change": "Read explicitly reviewed revision-bound role/diet evidence for v2 publication; do not add new IDs into the legacy 50-ID classifier or mark drafts VERIFIED."
+    },
+    {
+      "code": "QUANTITY_EVIDENCE_ENTITY_NAMESPACE",
+      "status": "BLOCKS_QUANTITY_APPROVAL",
+      "affected_lines": 50,
+      "locations": [
+        "source/database/import_vegetarian_v2.py:build_plan",
+        "source/server/mysql_calculation_catalog.py:claims",
+        "source/server/mysql_calculation_catalog.py:_proofs"
+      ],
+      "finding": "Imported quantity entity_ref is revision:<revision_id>:<line_no>; calculator proof requires line:<revision_id>:<line_no>. A status change cannot fix this.",
+      "required_change": "Before quantity approval, add canonical line-scoped evidence and bind the exact reviewed subject hash. Preserve original observations and importer replay safety; do not loosen _proofs or rewrite reviewed evidence."
+    },
+    {
+      "code": "CALCULATION_LEGACY_ID_MAPPING",
+      "status": "BLOCKS_NEW_RECIPE_CALCULATION",
+      "locations": [
+        "source/server/mysql_calculation_catalog.py:read_snapshot",
+        "source/server/mysql_calculation_catalog.py:_catalog"
+      ],
+      "finding": "Release members are selected and exposed by legacy_recipe_id; all six source recipes deliberately have no legacy identity.",
+      "required_change": "Explicitly support public v2 recipe identities in the adapter and pinned release selection. Never invent a legacy mapping."
+    }
+  ],
+  "minimum_distinct_recipe_counts": {
+    "2": {
+      "main": 1,
+      "vegetable": 1,
+      "soup": 0
+    },
+    "4": {
+      "main": 1,
+      "vegetable": 1,
+      "soup": 1
+    },
+    "6": {
+      "main": 2,
+      "vegetable": 1,
+      "soup": 1
+    },
+    "8": {
+      "main": 2,
+      "vegetable": 2,
+      "soup": 1
+    }
+  },
+  "coverage_if_all_six_pass_review_and_integration": {
+    "main": 2,
+    "vegetable": 2,
+    "soup": 2,
+    "people_2_4_6_8": "Count coverage only; ingredient, time and pin filters can still make a meal impossible.",
+    "people_8_note": "Both mains and both vegetables are required. A pinned recipe in such a group may have no alternative for replacement."
+  },
+  "review_steps": [
+    "Review the selected variant, full components (including seasonings, optional and instruction-only items) and source notes for each recipe; decide missing product compositions and unresolved fields. Start with V02/V12.",
+    "Record a real reviewer identity/date, claim scope/entity, evidence set and canonical subject hash. Source, content, role and diet are distinct decisions; quantities/forms/units/scaling/portion allocation are further distinct decisions.",
+    "Correct canonical quantity evidence bindings before quantitative approval. Any unsupported quantity or incomplete component remains NEEDS_VERIFICATION; keep INCOMPLETE for real calculation as required.",
+    "Implement/test an inactive release-gated v2 reader end to end, then publish and activate only an explicitly reviewed release when instructed. Enable Chay only for headcounts with enough eligible distinct recipes."
+  ],
+  "recipes": [
+    {
+      "recipe_key": "V02",
+      "recipe_id": 3685705018,
+      "revision_id": 379258889,
+      "title": "Đậu phụ xào sả",
+      "source_url": "https://thevietvegan.com/lemongrass-tofu/",
+      "base_servings": "4.000",
+      "minutes": 20,
+      "role_proposed": "main",
+      "unreviewed_database_fields": {
+        "v2_recipe_revisions": [
+          {
+            "key": {
+              "id": 379258889
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_sources": [
+          {
+            "key": {
+              "id": 4013385383
+            },
+            "fields": [
+              "verification_status"
+            ]
+          }
+        ],
+        "v2_recipe_ingredient_lines": [
+          {
+            "key": {
+              "revision_id": 379258889,
+              "line_no": 1
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 379258889,
+              "line_no": 2
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 379258889,
+              "line_no": 3
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 379258889,
+              "line_no": 4
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 379258889,
+              "line_no": 5
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 379258889,
+              "line_no": 6
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 379258889,
+              "line_no": 7
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_ingredients": [
+          {
+            "key": {
+              "id": 1216186474
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1283259840
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1777706396
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1962672862
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3059478178
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3518136552
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 4222713556
+            },
+            "fields": [
+              "identity_status"
+            ]
+          }
+        ],
+        "v2_units": [
+          {
+            "key": {
+              "id": 741384647
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1626635691
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1984549690
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2159494817
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3013893863
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3301889189
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ]
+      },
+      "unreviewed_dossier_fields": [
+        "role_review_status",
+        "source.verification_status",
+        "ingredient_lines[0].review_status",
+        "ingredient_lines[1].review_status",
+        "ingredient_lines[2].review_status",
+        "ingredient_lines[3].review_status",
+        "ingredient_lines[4].review_status",
+        "ingredient_lines[5].review_status",
+        "ingredient_lines[6].review_status",
+        "diet_review_status",
+        "review_status"
+      ],
+      "required_missing_fields": {
+        "source.accessed_at": null,
+        "revision.content_complete": 0,
+        "revision.content_review_id": null,
+        "revision.servings_review_id": null,
+        "role_and_diet_review_decisions": "absent; observations only",
+        "identity_and_unit_evidence_sets": "NULL on all new ingredient identities and units"
+      },
+      "lines": [
+        {
+          "line_no": 1,
+          "name": "vegetable oil",
+          "quantity_raw": "1 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 1216186474,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3218650518
+        },
+        {
+          "line_no": 2,
+          "name": "onion",
+          "quantity_raw": "1 piece",
+          "amount_kind": "exact",
+          "ingredient_id": 1962672862,
+          "unit_symbol": "piece",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3668824240
+        },
+        {
+          "line_no": 3,
+          "name": "garlic",
+          "quantity_raw": "3 clove",
+          "amount_kind": "exact",
+          "ingredient_id": 1283259840,
+          "unit_symbol": "clove",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1146996177
+        },
+        {
+          "line_no": 4,
+          "name": "fresh lemongrass",
+          "quantity_raw": "2 stalk",
+          "amount_kind": "exact",
+          "ingredient_id": 1777706396,
+          "unit_symbol": "stalk",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 4136509390
+        },
+        {
+          "line_no": 5,
+          "name": "dried chili flakes",
+          "quantity_raw": "0.5 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 4222713556,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3857888957
+        },
+        {
+          "line_no": 6,
+          "name": "fried tofu",
+          "quantity_raw": "1 lb",
+          "amount_kind": "exact",
+          "ingredient_id": 3518136552,
+          "unit_symbol": "lb",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3291251869
+        },
+        {
+          "line_no": 7,
+          "name": "soy sauce",
+          "quantity_raw": "('2', '3') tbsp",
+          "amount_kind": "range",
+          "ingredient_id": 3059478178,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3909353676
+        }
+      ],
+      "evidence_ids": [
+        23387836,
+        53532256,
+        522248197,
+        1146996177,
+        2499852745,
+        3218650518,
+        3291251869,
+        3668824240,
+        3857888957,
+        3909353676,
+        4136509390
+      ],
+      "quantity_evidence_entity_ref_mismatches": [
+        {
+          "line_no": 1,
+          "evidence_id": 3218650518,
+          "actual": "revision:379258889:1",
+          "calculator_requires": "line:379258889:1"
+        },
+        {
+          "line_no": 2,
+          "evidence_id": 3668824240,
+          "actual": "revision:379258889:2",
+          "calculator_requires": "line:379258889:2"
+        },
+        {
+          "line_no": 3,
+          "evidence_id": 1146996177,
+          "actual": "revision:379258889:3",
+          "calculator_requires": "line:379258889:3"
+        },
+        {
+          "line_no": 4,
+          "evidence_id": 4136509390,
+          "actual": "revision:379258889:4",
+          "calculator_requires": "line:379258889:4"
+        },
+        {
+          "line_no": 5,
+          "evidence_id": 3857888957,
+          "actual": "revision:379258889:5",
+          "calculator_requires": "line:379258889:5"
+        },
+        {
+          "line_no": 6,
+          "evidence_id": 3291251869,
+          "actual": "revision:379258889:6",
+          "calculator_requires": "line:379258889:6"
+        },
+        {
+          "line_no": 7,
+          "evidence_id": 3909353676,
+          "actual": "revision:379258889:7",
+          "calculator_requires": "line:379258889:7"
+        }
+      ],
+      "source_recheck": {
+        "priority": 1,
+        "proposal": "PRIORITIZE_SOURCE_CONTENT_REVIEW",
+        "observed": "Bản mặc định có 7 dòng, 4 suất, 20 phút; nguồn nêu rõ dầu thực vật. Chọn hành tây, sả tươi và đậu đã rán; giữ khoảng nước tương 2–3 tbsp.",
+        "diet_gaps": [
+          "Duyệt danh tính/thành phần đậu rán và nước tương; chỉ sử dụng dầu thực vật.",
+          "Chốt phạm vi món riêng; cơm/bún/bánh tráng ăn kèm không thuộc lượng của món này."
+        ],
+        "portion_gaps": [
+          "Chưa duyệt dạng đậu rán và trạng thái hành, tỏi, sả; chưa duyệt đơn vị lb, tbsp, tsp và đơn vị đếm.",
+          "Chưa duyệt tăng lượng và phân bổ suất nguồn cho người ăn trong mâm."
+        ],
+        "source_sections": [
+          "Recipe card > Ingredients, Instructions, Notes"
+        ]
+      },
+      "proposal_only": true,
+      "user_decisions": {
+        "source": null,
+        "content": null,
+        "role": null,
+        "diet": null,
+        "servings": null,
+        "quantities_and_units": null,
+        "scaling_and_allocation": null,
+        "reviewer_ref": null,
+        "reviewed_on": null
+      },
+      "database_status_preserved": "NEEDS_VERIFICATION"
+    },
+    {
+      "recipe_key": "V07",
+      "recipe_id": 3297541855,
+      "revision_id": 992919278,
+      "title": "Đậu phụ rán tẩm hành chay",
+      "source_url": "https://thevietvegan.com/vietnamese-fried-tofu-with-green-onion-sauce/",
+      "base_servings": "4.000",
+      "minutes": 50,
+      "role_proposed": "main",
+      "unreviewed_database_fields": {
+        "v2_recipe_revisions": [
+          {
+            "key": {
+              "id": 992919278
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_sources": [
+          {
+            "key": {
+              "id": 3210199941
+            },
+            "fields": [
+              "verification_status"
+            ]
+          }
+        ],
+        "v2_recipe_ingredient_lines": [
+          {
+            "key": {
+              "revision_id": 992919278,
+              "line_no": 1
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 992919278,
+              "line_no": 2
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 992919278,
+              "line_no": 3
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 992919278,
+              "line_no": 4
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 992919278,
+              "line_no": 5
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 992919278,
+              "line_no": 6
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 992919278,
+              "line_no": 7
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_ingredients": [
+          {
+            "key": {
+              "id": 27048261
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1328004054
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1455305112
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1648567531
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2018167893
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2106964774
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2881533355
+            },
+            "fields": [
+              "identity_status"
+            ]
+          }
+        ],
+        "v2_units": [
+          {
+            "key": {
+              "id": 1626635691
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1984549690
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2607440949
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3013893863
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ]
+      },
+      "unreviewed_dossier_fields": [
+        "role_review_status",
+        "source.verification_status",
+        "ingredient_lines[0].review_status",
+        "ingredient_lines[1].review_status",
+        "ingredient_lines[2].review_status",
+        "ingredient_lines[3].review_status",
+        "ingredient_lines[4].review_status",
+        "ingredient_lines[5].review_status",
+        "ingredient_lines[6].review_status",
+        "diet_review_status",
+        "review_status"
+      ],
+      "required_missing_fields": {
+        "source.accessed_at": null,
+        "revision.content_complete": 0,
+        "revision.content_review_id": null,
+        "revision.servings_review_id": null,
+        "role_and_diet_review_decisions": "absent; observations only",
+        "identity_and_unit_evidence_sets": "NULL on all new ingredient identities and units"
+      },
+      "lines": [
+        {
+          "line_no": 1,
+          "name": "medium tofu",
+          "quantity_raw": "350 g",
+          "amount_kind": "exact",
+          "ingredient_id": 2881533355,
+          "unit_symbol": "g",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 779664665
+        },
+        {
+          "line_no": 2,
+          "name": "frying oil",
+          "quantity_raw": "pot depth about 3 inches, not a volume",
+          "amount_kind": "unknown",
+          "ingredient_id": 2106964774,
+          "unit_symbol": null,
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1454650670
+        },
+        {
+          "line_no": 3,
+          "name": "green onion",
+          "quantity_raw": "2 stalk",
+          "amount_kind": "exact",
+          "ingredient_id": 1648567531,
+          "unit_symbol": "stalk",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1256992932
+        },
+        {
+          "line_no": 4,
+          "name": "hot vegetable oil",
+          "quantity_raw": "2 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 27048261,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1890046562
+        },
+        {
+          "line_no": 5,
+          "name": "vegan fish sauce",
+          "quantity_raw": "2 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 1328004054,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1607090125
+        },
+        {
+          "line_no": 6,
+          "name": "mushroom broth powder",
+          "quantity_raw": "1 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 1455305112,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3963407021
+        },
+        {
+          "line_no": 7,
+          "name": "hot water",
+          "quantity_raw": "6 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2018167893,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 133256366
+        }
+      ],
+      "evidence_ids": [
+        133256366,
+        779664665,
+        1098110130,
+        1256992932,
+        1454650670,
+        1607090125,
+        1785853041,
+        1890046562,
+        3657289887,
+        3936045981,
+        3963407021
+      ],
+      "quantity_evidence_entity_ref_mismatches": [
+        {
+          "line_no": 1,
+          "evidence_id": 779664665,
+          "actual": "revision:992919278:1",
+          "calculator_requires": "line:992919278:1"
+        },
+        {
+          "line_no": 2,
+          "evidence_id": 1454650670,
+          "actual": "revision:992919278:2",
+          "calculator_requires": "line:992919278:2"
+        },
+        {
+          "line_no": 3,
+          "evidence_id": 1256992932,
+          "actual": "revision:992919278:3",
+          "calculator_requires": "line:992919278:3"
+        },
+        {
+          "line_no": 4,
+          "evidence_id": 1890046562,
+          "actual": "revision:992919278:4",
+          "calculator_requires": "line:992919278:4"
+        },
+        {
+          "line_no": 5,
+          "evidence_id": 1607090125,
+          "actual": "revision:992919278:5",
+          "calculator_requires": "line:992919278:5"
+        },
+        {
+          "line_no": 6,
+          "evidence_id": 3963407021,
+          "actual": "revision:992919278:6",
+          "calculator_requires": "line:992919278:6"
+        },
+        {
+          "line_no": 7,
+          "evidence_id": 133256366,
+          "actual": "revision:992919278:7",
+          "calculator_requires": "line:992919278:7"
+        }
+      ],
+      "source_recheck": {
+        "priority": 3,
+        "proposal": "HOLD_FOR_COMPONENT_AND_OIL_REVIEW",
+        "observed": "Bản nguồn có 7 dòng, 4 suất, tổng 50 phút gồm 5 phút bổ sung. Hai tbsp dầu sốt được lấy từ nồi dầu chiên.",
+        "diet_gaps": [
+          "Cần bằng chứng thành phần của vegan fish sauce và mushroom broth powder; không dùng nước mắm thường.",
+          "Xác nhận dầu trong nồi là dầu thực vật, cùng loại với dầu dùng làm sốt; duyệt danh tính medium tofu.",
+          "Nguồn xếp Appetizers & Sides; vai trò main trong mâm là đề xuất biên tập cần người duyệt quyết định."
+        ],
+        "portion_gaps": [
+          "Dầu chiên chỉ ghi độ sâu khoảng 3 inch: không phải thể tích, không thể quy đổi thành lượng mua.",
+          "Chưa có biểu diễn được duyệt cho dầu lấy lại từ cùng nồi; không cộng 2 tbsp thành dầu mua thêm.",
+          "Chưa duyệt chính sách tăng lượng và vai trò món khi phân bổ khẩu phần."
+        ],
+        "source_sections": [
+          "Recipe card > For the tofu; For the Sauce; Instructions; timing; Notes"
+        ]
+      },
+      "proposal_only": true,
+      "user_decisions": {
+        "source": null,
+        "content": null,
+        "role": null,
+        "diet": null,
+        "servings": null,
+        "quantities_and_units": null,
+        "scaling_and_allocation": null,
+        "reviewer_ref": null,
+        "reviewed_on": null
+      },
+      "database_status_preserved": "NEEDS_VERIFICATION"
+    },
+    {
+      "recipe_key": "V12",
+      "recipe_id": 3665631389,
+      "revision_id": 3812492879,
+      "title": "Đậu rồng xào tỏi",
+      "source_url": "https://fullofplants.com/garlic-winged-beans/",
+      "base_servings": "2.000",
+      "minutes": 15,
+      "role_proposed": "vegetable",
+      "unreviewed_database_fields": {
+        "v2_recipe_revisions": [
+          {
+            "key": {
+              "id": 3812492879
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_sources": [
+          {
+            "key": {
+              "id": 664930949
+            },
+            "fields": [
+              "verification_status"
+            ]
+          }
+        ],
+        "v2_recipe_ingredient_lines": [
+          {
+            "key": {
+              "revision_id": 3812492879,
+              "line_no": 1
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 3812492879,
+              "line_no": 2
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 3812492879,
+              "line_no": 3
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 3812492879,
+              "line_no": 4
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 3812492879,
+              "line_no": 5
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 3812492879,
+              "line_no": 6
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 3812492879,
+              "line_no": 7
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_ingredients": [
+          {
+            "key": {
+              "id": 334361095
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 891047879
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1148240742
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1283259840
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2056836464
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2865256237
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3731415834
+            },
+            "fields": [
+              "identity_status"
+            ]
+          }
+        ],
+        "v2_units": [
+          {
+            "key": {
+              "id": 1626635691
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2159494817
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2607440949
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3013893863
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ]
+      },
+      "unreviewed_dossier_fields": [
+        "role_review_status",
+        "source.verification_status",
+        "ingredient_lines[0].review_status",
+        "ingredient_lines[1].review_status",
+        "ingredient_lines[2].review_status",
+        "ingredient_lines[3].review_status",
+        "ingredient_lines[4].review_status",
+        "ingredient_lines[5].review_status",
+        "ingredient_lines[6].review_status",
+        "diet_review_status",
+        "review_status"
+      ],
+      "required_missing_fields": {
+        "source.accessed_at": null,
+        "revision.content_complete": 0,
+        "revision.content_review_id": null,
+        "revision.servings_review_id": null,
+        "role_and_diet_review_decisions": "absent; observations only",
+        "identity_and_unit_evidence_sets": "NULL on all new ingredient identities and units"
+      },
+      "lines": [
+        {
+          "line_no": 1,
+          "name": "oil",
+          "quantity_raw": "2 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 891047879,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 405384232
+        },
+        {
+          "line_no": 2,
+          "name": "garlic",
+          "quantity_raw": "3 clove",
+          "amount_kind": "exact",
+          "ingredient_id": 1283259840,
+          "unit_symbol": "clove",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3957976999
+        },
+        {
+          "line_no": 3,
+          "name": "winged bean pods",
+          "quantity_raw": "10 pods (170 g); selected stated mass",
+          "amount_kind": "exact",
+          "ingredient_id": 1148240742,
+          "unit_symbol": "g",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3366747340
+        },
+        {
+          "line_no": 4,
+          "name": "water",
+          "quantity_raw": "2 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 334361095,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1399433954
+        },
+        {
+          "line_no": 5,
+          "name": "salt",
+          "quantity_raw": "0.125 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2865256237,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 2601063205
+        },
+        {
+          "line_no": 6,
+          "name": "sugar",
+          "quantity_raw": "0.25 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 3731415834,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1932916558
+        },
+        {
+          "line_no": 7,
+          "name": "black pepper",
+          "quantity_raw": "0.125 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2056836464,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 2860524537
+        }
+      ],
+      "evidence_ids": [
+        47837557,
+        54219630,
+        405384232,
+        923899823,
+        1399433954,
+        1932916558,
+        2225052383,
+        2601063205,
+        2860524537,
+        3366747340,
+        3957976999
+      ],
+      "quantity_evidence_entity_ref_mismatches": [
+        {
+          "line_no": 1,
+          "evidence_id": 405384232,
+          "actual": "revision:3812492879:1",
+          "calculator_requires": "line:3812492879:1"
+        },
+        {
+          "line_no": 2,
+          "evidence_id": 3957976999,
+          "actual": "revision:3812492879:2",
+          "calculator_requires": "line:3812492879:2"
+        },
+        {
+          "line_no": 3,
+          "evidence_id": 3366747340,
+          "actual": "revision:3812492879:3",
+          "calculator_requires": "line:3812492879:3"
+        },
+        {
+          "line_no": 4,
+          "evidence_id": 1399433954,
+          "actual": "revision:3812492879:4",
+          "calculator_requires": "line:3812492879:4"
+        },
+        {
+          "line_no": 5,
+          "evidence_id": 2601063205,
+          "actual": "revision:3812492879:5",
+          "calculator_requires": "line:3812492879:5"
+        },
+        {
+          "line_no": 6,
+          "evidence_id": 1932916558,
+          "actual": "revision:3812492879:6",
+          "calculator_requires": "line:3812492879:6"
+        },
+        {
+          "line_no": 7,
+          "evidence_id": 2860524537,
+          "actual": "revision:3812492879:7",
+          "calculator_requires": "line:3812492879:7"
+        }
+      ],
+      "source_recheck": {
+        "priority": 2,
+        "proposal": "PRIORITIZE_SOURCE_CONTENT_REVIEW",
+        "observed": "Bản nguồn có 7 dòng kể cả nước, 2 suất món phụ, 15 phút. 170 g là khối lượng do chính nguồn ghi, không suy ra từ số quả.",
+        "diet_gaps": [
+          "Nguồn ghi oil chung: cần chốt bằng chứng loại dầu thực vật, không tự đổi thành một loại dầu cụ thể.",
+          "Duyệt đầy đủ muối, đường, tiêu và danh tính đậu rồng; không chỉ duyệt tên món."
+        ],
+        "portion_gaps": [
+          "Chưa duyệt dạng đậu rồng/tỏi, cơ sở cân và các đơn vị.",
+          "Nguồn cho 2 suất món phụ; chưa có phân bổ suất nguồn trong mâm và quy tắc tăng lượng được duyệt."
+        ],
+        "source_sections": [
+          "Recipe card > Ingredients, Instructions, Notes; How to Cook It"
+        ]
+      },
+      "proposal_only": true,
+      "user_decisions": {
+        "source": null,
+        "content": null,
+        "role": null,
+        "diet": null,
+        "servings": null,
+        "quantities_and_units": null,
+        "scaling_and_allocation": null,
+        "reviewer_ref": null,
+        "reviewed_on": null
+      },
+      "database_status_preserved": "NEEDS_VERIFICATION"
+    },
+    {
+      "recipe_key": "V13",
+      "recipe_id": 1643267492,
+      "revision_id": 406989983,
+      "title": "Bắp cải Savoy om tỏi",
+      "source_url": "https://fullofplants.com/braised-savoy-cabbage/",
+      "base_servings": "2.000",
+      "minutes": 30,
+      "role_proposed": "vegetable",
+      "unreviewed_database_fields": {
+        "v2_recipe_revisions": [
+          {
+            "key": {
+              "id": 406989983
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_sources": [
+          {
+            "key": {
+              "id": 31742101
+            },
+            "fields": [
+              "verification_status"
+            ]
+          }
+        ],
+        "v2_recipe_ingredient_lines": [
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 1
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 2
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 3
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 4
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 5
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 6
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 7
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 406989983,
+              "line_no": 8
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_ingredients": [
+          {
+            "key": {
+              "id": 334361095
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1283259840
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1434559803
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2056836464
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3059478178
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3284972646
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 4044389515
+            },
+            "fields": [
+              "identity_status"
+            ]
+          }
+        ],
+        "v2_units": [
+          {
+            "key": {
+              "id": 1626635691
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1881431968
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2159494817
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2607440949
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3013893863
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ]
+      },
+      "unreviewed_dossier_fields": [
+        "role_review_status",
+        "source.verification_status",
+        "ingredient_lines[0].review_status",
+        "ingredient_lines[1].review_status",
+        "ingredient_lines[2].review_status",
+        "ingredient_lines[3].review_status",
+        "ingredient_lines[4].review_status",
+        "ingredient_lines[5].review_status",
+        "ingredient_lines[6].review_status",
+        "ingredient_lines[7].review_status",
+        "diet_review_status",
+        "review_status"
+      ],
+      "required_missing_fields": {
+        "source.accessed_at": null,
+        "revision.content_complete": 0,
+        "revision.content_review_id": null,
+        "revision.servings_review_id": null,
+        "role_and_diet_review_decisions": "absent; observations only",
+        "identity_and_unit_evidence_sets": "NULL on all new ingredient identities and units"
+      },
+      "lines": [
+        {
+          "line_no": 1,
+          "name": "savoy cabbage",
+          "quantity_raw": "1/4 head (250 g); selected stated mass",
+          "amount_kind": "exact",
+          "ingredient_id": 4044389515,
+          "unit_symbol": "g",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1752835485
+        },
+        {
+          "line_no": 2,
+          "name": "olive oil",
+          "quantity_raw": "2 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 3284972646,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 872365157
+        },
+        {
+          "line_no": 3,
+          "name": "water",
+          "quantity_raw": "0.5 cup",
+          "amount_kind": "exact",
+          "ingredient_id": 334361095,
+          "unit_symbol": "cup",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 859433064
+        },
+        {
+          "line_no": 4,
+          "name": "vegan butter",
+          "quantity_raw": "1 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 1434559803,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 920896871
+        },
+        {
+          "line_no": 5,
+          "name": "garlic",
+          "quantity_raw": "3 clove",
+          "amount_kind": "exact",
+          "ingredient_id": 1283259840,
+          "unit_symbol": "clove",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1177832529
+        },
+        {
+          "line_no": 6,
+          "name": "soy sauce",
+          "quantity_raw": "1 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 3059478178,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 978895703
+        },
+        {
+          "line_no": 7,
+          "name": "black pepper",
+          "quantity_raw": "0.25 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2056836464,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3673484983
+        },
+        {
+          "line_no": 8,
+          "name": "water",
+          "quantity_raw": "0.25 cup",
+          "amount_kind": "exact",
+          "ingredient_id": 334361095,
+          "unit_symbol": "cup",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3433861721
+        }
+      ],
+      "evidence_ids": [
+        859433064,
+        872365157,
+        920896871,
+        978895703,
+        1177832529,
+        1233503153,
+        1474062778,
+        1752835485,
+        3081196196,
+        3433861721,
+        3673484983,
+        3705339344
+      ],
+      "quantity_evidence_entity_ref_mismatches": [
+        {
+          "line_no": 1,
+          "evidence_id": 1752835485,
+          "actual": "revision:406989983:1",
+          "calculator_requires": "line:406989983:1"
+        },
+        {
+          "line_no": 2,
+          "evidence_id": 872365157,
+          "actual": "revision:406989983:2",
+          "calculator_requires": "line:406989983:2"
+        },
+        {
+          "line_no": 3,
+          "evidence_id": 859433064,
+          "actual": "revision:406989983:3",
+          "calculator_requires": "line:406989983:3"
+        },
+        {
+          "line_no": 4,
+          "evidence_id": 920896871,
+          "actual": "revision:406989983:4",
+          "calculator_requires": "line:406989983:4"
+        },
+        {
+          "line_no": 5,
+          "evidence_id": 1177832529,
+          "actual": "revision:406989983:5",
+          "calculator_requires": "line:406989983:5"
+        },
+        {
+          "line_no": 6,
+          "evidence_id": 978895703,
+          "actual": "revision:406989983:6",
+          "calculator_requires": "line:406989983:6"
+        },
+        {
+          "line_no": 7,
+          "evidence_id": 3673484983,
+          "actual": "revision:406989983:7",
+          "calculator_requires": "line:406989983:7"
+        },
+        {
+          "line_no": 8,
+          "evidence_id": 3433861721,
+          "actual": "revision:406989983:8",
+          "calculator_requires": "line:406989983:8"
+        }
+      ],
+      "source_recheck": {
+        "priority": 4,
+        "proposal": "HOLD_FOR_PRODUCT_AND_VARIANT_REVIEW",
+        "observed": "Bản mặc định có 8 dòng, 2 suất món phụ, 30 phút; hai dòng nước thuộc giai đoạn hấp và sốt.",
+        "diet_gaps": [
+          "Cần duyệt thành phần vegan butter và soy sauce; không thay bằng bơ sữa.",
+          "Nguồn còn nêu đổi nước tương sang muối, thêm rau thơm, dầu mè hoặc kem thực vật: phải chốt chỉ bản mặc định đã thu thập."
+        ],
+        "portion_gaps": [
+          "Nguồn cho phép thêm nước nếu cạn; cần biểu diễn điều kiện này, không tự gán một lượng cố định mới.",
+          "Nguồn yêu cầu nấu nhiều mẻ khi tăng gấp đôi; không suy ra thời gian tăng tuyến tính.",
+          "Chưa duyệt dạng cải, đơn vị, tăng lượng và phân bổ suất món phụ."
+        ],
+        "source_sections": [
+          "Ingredient Notes; Recipe card > Ingredients, Instructions, Notes; Variations"
+        ]
+      },
+      "proposal_only": true,
+      "user_decisions": {
+        "source": null,
+        "content": null,
+        "role": null,
+        "diet": null,
+        "servings": null,
+        "quantities_and_units": null,
+        "scaling_and_allocation": null,
+        "reviewer_ref": null,
+        "reviewed_on": null
+      },
+      "database_status_preserved": "NEEDS_VERIFICATION"
+    },
+    {
+      "recipe_key": "V16",
+      "recipe_id": 1836954336,
+      "revision_id": 2819792141,
+      "title": "Canh nấm gừng sả",
+      "source_url": "https://fullofplants.com/healing-lemongrass-mushroom-broth/",
+      "base_servings": "2.000",
+      "minutes": 20,
+      "role_proposed": "soup",
+      "unreviewed_database_fields": {
+        "v2_recipe_revisions": [
+          {
+            "key": {
+              "id": 2819792141
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_sources": [
+          {
+            "key": {
+              "id": 1155490354
+            },
+            "fields": [
+              "verification_status"
+            ]
+          }
+        ],
+        "v2_recipe_ingredient_lines": [
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 1
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 2
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 3
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 4
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 5
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 6
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 7
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 8
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 9
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 2819792141,
+              "line_no": 10
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_ingredients": [
+          {
+            "key": {
+              "id": 25575961
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 334361095
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 891047879
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2056836464
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2305103091
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2354234665
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2473513125
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2865256237
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3053282168
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3332276124
+            },
+            "fields": [
+              "identity_status"
+            ]
+          }
+        ],
+        "v2_units": [
+          {
+            "key": {
+              "id": 1626635691
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1984549690
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2607440949
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3013893863
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 4209501343
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ]
+      },
+      "unreviewed_dossier_fields": [
+        "role_review_status",
+        "source.verification_status",
+        "ingredient_lines[0].review_status",
+        "ingredient_lines[1].review_status",
+        "ingredient_lines[2].review_status",
+        "ingredient_lines[3].review_status",
+        "ingredient_lines[4].review_status",
+        "ingredient_lines[5].review_status",
+        "ingredient_lines[6].review_status",
+        "ingredient_lines[7].review_status",
+        "ingredient_lines[8].review_status",
+        "ingredient_lines[9].review_status",
+        "diet_review_status",
+        "review_status"
+      ],
+      "required_missing_fields": {
+        "source.accessed_at": null,
+        "revision.content_complete": 0,
+        "revision.content_review_id": null,
+        "revision.servings_review_id": null,
+        "role_and_diet_review_decisions": "absent; observations only",
+        "identity_and_unit_evidence_sets": "NULL on all new ingredient identities and units"
+      },
+      "lines": [
+        {
+          "line_no": 1,
+          "name": "oil",
+          "quantity_raw": "1 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 891047879,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3616426614
+        },
+        {
+          "line_no": 2,
+          "name": "lemongrass",
+          "quantity_raw": "4 stalk",
+          "amount_kind": "exact",
+          "ingredient_id": 2354234665,
+          "unit_symbol": "stalk",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3202616642
+        },
+        {
+          "line_no": 3,
+          "name": "sliced ginger",
+          "quantity_raw": "2 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 3053282168,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3962646239
+        },
+        {
+          "line_no": 4,
+          "name": "sliced mushrooms",
+          "quantity_raw": "2 cups (160 g); selected stated mass",
+          "amount_kind": "exact",
+          "ingredient_id": 3332276124,
+          "unit_symbol": "g",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 708061198
+        },
+        {
+          "line_no": 5,
+          "name": "water",
+          "quantity_raw": "2.5 cups (600 mL); selected stated volume",
+          "amount_kind": "exact",
+          "ingredient_id": 334361095,
+          "unit_symbol": "ml",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 865322856
+        },
+        {
+          "line_no": 6,
+          "name": "salt",
+          "quantity_raw": "0.5 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2865256237,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3975783993
+        },
+        {
+          "line_no": 7,
+          "name": "maple syrup",
+          "quantity_raw": "1 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2473513125,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1658636366
+        },
+        {
+          "line_no": 8,
+          "name": "lime juice",
+          "quantity_raw": "1 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 25575961,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1320282961
+        },
+        {
+          "line_no": 9,
+          "name": "black pepper",
+          "quantity_raw": "0.125 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2056836464,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 747372601
+        },
+        {
+          "line_no": 10,
+          "name": "cilantro",
+          "quantity_raw": "không ghi lượng",
+          "amount_kind": "unknown",
+          "ingredient_id": 2305103091,
+          "unit_symbol": null,
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 177296247
+        }
+      ],
+      "evidence_ids": [
+        24545688,
+        177296247,
+        303294476,
+        708061198,
+        747372601,
+        865322856,
+        929772061,
+        1320282961,
+        1616853387,
+        1658636366,
+        3202616642,
+        3616426614,
+        3962646239,
+        3975783993
+      ],
+      "quantity_evidence_entity_ref_mismatches": [
+        {
+          "line_no": 1,
+          "evidence_id": 3616426614,
+          "actual": "revision:2819792141:1",
+          "calculator_requires": "line:2819792141:1"
+        },
+        {
+          "line_no": 2,
+          "evidence_id": 3202616642,
+          "actual": "revision:2819792141:2",
+          "calculator_requires": "line:2819792141:2"
+        },
+        {
+          "line_no": 3,
+          "evidence_id": 3962646239,
+          "actual": "revision:2819792141:3",
+          "calculator_requires": "line:2819792141:3"
+        },
+        {
+          "line_no": 4,
+          "evidence_id": 708061198,
+          "actual": "revision:2819792141:4",
+          "calculator_requires": "line:2819792141:4"
+        },
+        {
+          "line_no": 5,
+          "evidence_id": 865322856,
+          "actual": "revision:2819792141:5",
+          "calculator_requires": "line:2819792141:5"
+        },
+        {
+          "line_no": 6,
+          "evidence_id": 3975783993,
+          "actual": "revision:2819792141:6",
+          "calculator_requires": "line:2819792141:6"
+        },
+        {
+          "line_no": 7,
+          "evidence_id": 1658636366,
+          "actual": "revision:2819792141:7",
+          "calculator_requires": "line:2819792141:7"
+        },
+        {
+          "line_no": 8,
+          "evidence_id": 1320282961,
+          "actual": "revision:2819792141:8",
+          "calculator_requires": "line:2819792141:8"
+        },
+        {
+          "line_no": 9,
+          "evidence_id": 747372601,
+          "actual": "revision:2819792141:9",
+          "calculator_requires": "line:2819792141:9"
+        },
+        {
+          "line_no": 10,
+          "evidence_id": 177296247,
+          "actual": "revision:2819792141:10",
+          "calculator_requires": "line:2819792141:10"
+        }
+      ],
+      "source_recheck": {
+        "priority": 5,
+        "proposal": "HOLD_FOR_EXPLICIT_VEGAN_VARIANT_REVIEW",
+        "observed": "Bản recipe card dùng maple syrup, có 10 dòng, 2 suất, 20 phút; ngò để dùng kèm không có số lượng.",
+        "diet_gaps": [
+          "Ingredient Notes có nhánh honey if not vegan: mật ong KHÔNG được đưa vào bản chay. Hồ sơ cũ chưa ghi nhánh này vào source_alternatives_not_selected.",
+          "Chốt bản recipe card dùng maple syrup; các add-ins/noodles/sausages/chicken là nhánh ngoài phạm vi, cần ghi giới hạn rõ.",
+          "Nguồn ghi oil chung; cần chốt bằng chứng dầu thực vật."
+        ],
+        "portion_gaps": [
+          "Ngò không có lượng: giữ UNKNOWN_QUANTITY, không mặc định bằng 0.",
+          "Một cây sả băm, ba cây sả đập dập ngâm nước: cần dạng/mục đích riêng thay vì mặc định tất cả consumed.",
+          "Chưa duyệt đơn vị, cơ sở đo, tăng lượng và phân bổ suất."
+        ],
+        "source_sections": [
+          "Ingredient Notes > Maple syrup; Add-ins; Recipe card > Ingredients, Instructions"
+        ]
+      },
+      "proposal_only": true,
+      "user_decisions": {
+        "source": null,
+        "content": null,
+        "role": null,
+        "diet": null,
+        "servings": null,
+        "quantities_and_units": null,
+        "scaling_and_allocation": null,
+        "reviewer_ref": null,
+        "reviewed_on": null
+      },
+      "database_status_preserved": "NEEDS_VERIFICATION"
+    },
+    {
+      "recipe_key": "V17",
+      "recipe_id": 1808618143,
+      "revision_id": 1906929526,
+      "title": "Súp bắp kem dừa chay",
+      "source_url": "https://fullofplants.com/easy-vegan-corn-soup/",
+      "base_servings": "2.000",
+      "minutes": 30,
+      "role_proposed": "soup",
+      "unreviewed_database_fields": {
+        "v2_recipe_revisions": [
+          {
+            "key": {
+              "id": 1906929526
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_sources": [
+          {
+            "key": {
+              "id": 928985589
+            },
+            "fields": [
+              "verification_status"
+            ]
+          }
+        ],
+        "v2_recipe_ingredient_lines": [
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 1
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 2
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 3
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 4
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 5
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 6
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 7
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 8
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 9
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 10
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "revision_id": 1906929526,
+              "line_no": 11
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ],
+        "v2_ingredients": [
+          {
+            "key": {
+              "id": 334361095
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 891047879
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1283259840
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1434559803
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2056836464
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2127412657
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2865256237
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3031719922
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3046367615
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3331361648
+            },
+            "fields": [
+              "identity_status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3731415834
+            },
+            "fields": [
+              "identity_status"
+            ]
+          }
+        ],
+        "v2_units": [
+          {
+            "key": {
+              "id": 498956887
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 741384647
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1626635691
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 1881431968
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 2159494817
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 3013893863
+            },
+            "fields": [
+              "status"
+            ]
+          },
+          {
+            "key": {
+              "id": 4209501343
+            },
+            "fields": [
+              "status"
+            ]
+          }
+        ]
+      },
+      "unreviewed_dossier_fields": [
+        "role_review_status",
+        "source.verification_status",
+        "ingredient_lines[0].review_status",
+        "ingredient_lines[1].review_status",
+        "ingredient_lines[2].review_status",
+        "ingredient_lines[3].review_status",
+        "ingredient_lines[4].review_status",
+        "ingredient_lines[5].review_status",
+        "ingredient_lines[6].review_status",
+        "ingredient_lines[7].review_status",
+        "ingredient_lines[8].review_status",
+        "ingredient_lines[9].review_status",
+        "ingredient_lines[10].review_status",
+        "diet_review_status",
+        "review_status"
+      ],
+      "required_missing_fields": {
+        "source.accessed_at": null,
+        "revision.content_complete": 0,
+        "revision.content_review_id": null,
+        "revision.servings_review_id": null,
+        "role_and_diet_review_decisions": "absent; observations only",
+        "identity_and_unit_evidence_sets": "NULL on all new ingredient identities and units"
+      },
+      "lines": [
+        {
+          "line_no": 1,
+          "name": "corn",
+          "quantity_raw": "2 ear",
+          "amount_kind": "exact",
+          "ingredient_id": 3046367615,
+          "unit_symbol": "ear",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1121722828
+        },
+        {
+          "line_no": 2,
+          "name": "vegan butter",
+          "quantity_raw": "1 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 1434559803,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 225394312
+        },
+        {
+          "line_no": 3,
+          "name": "oil",
+          "quantity_raw": "1 tbsp",
+          "amount_kind": "exact",
+          "ingredient_id": 891047879,
+          "unit_symbol": "tbsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3966032258
+        },
+        {
+          "line_no": 4,
+          "name": "shallot",
+          "quantity_raw": "2 piece",
+          "amount_kind": "exact",
+          "ingredient_id": 3331361648,
+          "unit_symbol": "piece",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 755305920
+        },
+        {
+          "line_no": 5,
+          "name": "garlic",
+          "quantity_raw": "2 clove",
+          "amount_kind": "exact",
+          "ingredient_id": 1283259840,
+          "unit_symbol": "clove",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 1509085863
+        },
+        {
+          "line_no": 6,
+          "name": "salt",
+          "quantity_raw": "0.5 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2865256237,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 2919690205
+        },
+        {
+          "line_no": 7,
+          "name": "sugar",
+          "quantity_raw": "1 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 3731415834,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 637493945
+        },
+        {
+          "line_no": 8,
+          "name": "black pepper",
+          "quantity_raw": "0.25 tsp",
+          "amount_kind": "exact",
+          "ingredient_id": 2056836464,
+          "unit_symbol": "tsp",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3227293326
+        },
+        {
+          "line_no": 9,
+          "name": "water",
+          "quantity_raw": "1.25 cups (300 mL); selected stated volume",
+          "amount_kind": "exact",
+          "ingredient_id": 334361095,
+          "unit_symbol": "ml",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 3618533606
+        },
+        {
+          "line_no": 10,
+          "name": "coconut cream",
+          "quantity_raw": "1/4 cup (60 mL)",
+          "amount_kind": "exact",
+          "ingredient_id": 2127412657,
+          "unit_symbol": "ml",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 673587478
+        },
+        {
+          "line_no": 11,
+          "name": "chopped green onion",
+          "quantity_raw": "0.25 cup",
+          "amount_kind": "exact",
+          "ingredient_id": 3031719922,
+          "unit_symbol": "cup",
+          "missing": {
+            "form_id": null,
+            "measurement_basis": "unknown",
+            "scaling_mode": null,
+            "quantity_review_id": null,
+            "scaling_evidence_set_id": null,
+            "scaling_review_id": null
+          },
+          "quantity_evidence_id": 632307056
+        }
+      ],
+      "evidence_ids": [
+        225394312,
+        632307056,
+        637493945,
+        673587478,
+        755305920,
+        1121722828,
+        1188792458,
+        1509085863,
+        2432032239,
+        2919690205,
+        3227293326,
+        3478457678,
+        3618533606,
+        3966032258,
+        4010688132
+      ],
+      "quantity_evidence_entity_ref_mismatches": [
+        {
+          "line_no": 1,
+          "evidence_id": 1121722828,
+          "actual": "revision:1906929526:1",
+          "calculator_requires": "line:1906929526:1"
+        },
+        {
+          "line_no": 2,
+          "evidence_id": 225394312,
+          "actual": "revision:1906929526:2",
+          "calculator_requires": "line:1906929526:2"
+        },
+        {
+          "line_no": 3,
+          "evidence_id": 3966032258,
+          "actual": "revision:1906929526:3",
+          "calculator_requires": "line:1906929526:3"
+        },
+        {
+          "line_no": 4,
+          "evidence_id": 755305920,
+          "actual": "revision:1906929526:4",
+          "calculator_requires": "line:1906929526:4"
+        },
+        {
+          "line_no": 5,
+          "evidence_id": 1509085863,
+          "actual": "revision:1906929526:5",
+          "calculator_requires": "line:1906929526:5"
+        },
+        {
+          "line_no": 6,
+          "evidence_id": 2919690205,
+          "actual": "revision:1906929526:6",
+          "calculator_requires": "line:1906929526:6"
+        },
+        {
+          "line_no": 7,
+          "evidence_id": 637493945,
+          "actual": "revision:1906929526:7",
+          "calculator_requires": "line:1906929526:7"
+        },
+        {
+          "line_no": 8,
+          "evidence_id": 3227293326,
+          "actual": "revision:1906929526:8",
+          "calculator_requires": "line:1906929526:8"
+        },
+        {
+          "line_no": 9,
+          "evidence_id": 3618533606,
+          "actual": "revision:1906929526:9",
+          "calculator_requires": "line:1906929526:9"
+        },
+        {
+          "line_no": 10,
+          "evidence_id": 673587478,
+          "actual": "revision:1906929526:10",
+          "calculator_requires": "line:1906929526:10"
+        },
+        {
+          "line_no": 11,
+          "evidence_id": 632307056,
+          "actual": "revision:1906929526:11",
+          "calculator_requires": "line:1906929526:11"
+        }
+      ],
+      "source_recheck": {
+        "priority": 6,
+        "proposal": "HOLD_FOR_PRODUCT_AND_SERVING_SCOPE_REVIEW",
+        "observed": "Bản kem dừa có 11 dòng, 2 suất khai vị, 30 phút. Phần bắp trang trí lấy từ cùng mẻ bắp.",
+        "diet_gaps": [
+          "Cần duyệt thành phần vegan butter, coconut cream và loại dầu; không thay bằng bơ/kem động vật.",
+          "Chốt nhánh coconut cream, không trộn lượng của nhánh full-fat coconut milk/kem khác."
+        ],
+        "portion_gaps": [
+          "2 suất là suất khai vị, không tự coi là 2 suất canh trong mâm.",
+          "Bắp giữ lại trang trí thuộc cùng mẻ, không cộng mua thêm.",
+          "Chưa duyệt dạng/nguyên liệu theo từng công đoạn, đơn vị, tăng lượng và phân bổ suất."
+        ],
+        "source_sections": [
+          "How to Make It; FAQ; Recipe card > Ingredients, Instructions, Servings"
+        ]
+      },
+      "proposal_only": true,
+      "user_decisions": {
+        "source": null,
+        "content": null,
+        "role": null,
+        "diet": null,
+        "servings": null,
+        "quantities_and_units": null,
+        "scaling_and_allocation": null,
+        "reviewer_ref": null,
+        "reviewed_on": null
+      },
+      "database_status_preserved": "NEEDS_VERIFICATION"
+    }
+  ]
+}

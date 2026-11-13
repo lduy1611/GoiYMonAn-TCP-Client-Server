@@ -40,3 +40,26 @@ def apply_structured_portions(connection) -> dict:
                 "status": "APPLIED" if applied else "NOOP_ALREADY_APPLIED"}
     finally:
         cursor.close()
+
+
+def apply_portion_reviews(connection):
+    """Add provenance to existing recipes; never classify existing data as verified."""
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SELECT DATABASE()")
+        database = cursor.fetchone()[0]
+        if not database or not database.endswith("_test"):
+            raise UnifiedV3MigrationError("portion review migration requires TEST_ONLY database")
+        cursor.execute("SHOW COLUMNS FROM recipes")
+        present = {row[0] for row in cursor.fetchall()}
+        added = []
+        for name, ddl in {
+            "portion_data_status": "ENUM('verified','estimated','needs_review') NOT NULL DEFAULT 'needs_review'",
+            "portion_data_evidence": "TEXT NULL",
+        }.items():
+            if name not in present:
+                cursor.execute(f"ALTER TABLE recipes ADD COLUMN {name} {ddl}")
+                added.append(name)
+        return {"database": database, "added_columns": added}
+    finally:
+        cursor.close()

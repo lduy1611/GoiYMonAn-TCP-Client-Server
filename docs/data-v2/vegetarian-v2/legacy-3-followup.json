@@ -1,0 +1,41 @@
+{
+  "checked_on": "2026-11-05",
+  "legacy_unchanged": true,
+  "cases": [
+    {
+      "legacy_recipe_id": 4,
+      "title": "Đậu phụ sốt cà chua",
+      "missing": [
+        "Gia vị của bước nêm vừa ăn",
+        "Chất béo chiên/phi chưa xác định"
+      ],
+      "candidate_recipe_key": "V01",
+      "result": "Nguồn độc lập có tamari rõ ràng; chỉ đề xuất công thức mới, không bổ sung các lượng này vào bản legacy.",
+      "status": "NEEDS_VERIFICATION"
+    },
+    {
+      "legacy_recipe_id": 5,
+      "title": "Rau muống xào tỏi",
+      "missing": [
+        "Loại dầu",
+        "Danh sách gia vị đầy đủ"
+      ],
+      "attempted_url": "https://www.dienmayxanh.com/vao-bep/cach-lam-rau-muong-xao-toi-ngon-thom-nuc-mui-dan-da-kho-cuong-09390",
+      "access_result": "DIRECT_OPEN_TIMEOUT",
+      "result": "Không dùng đoạn kết quả tìm kiếm để xác nhận thành phần; chưa hoàn thiện revision.",
+      "status": "NEEDS_VERIFICATION"
+    },
+    {
+      "legacy_recipe_id": 9,
+      "title": "Khoai tây xào cà rốt",
+      "missing": [
+        "Chất béo dùng phi hành",
+        "Gia vị nêm lại"
+      ],
+      "attempted_url": "https://www.dienmayxanh.com/vao-bep/3-cach-lam-khoai-tay-xao-toi-ngon-mieng-don-gian-de-lam-cho-08316",
+      "access_result": "DIRECT_OPEN_TIMEOUT",
+      "result": "Không lấy số liệu từ nguồn khác để vá bản cũ; chưa hoàn thiện revision.",
+      "status": "NEEDS_VERIFICATION"
+    }
+  ]
+}

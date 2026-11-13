@@ -252,7 +252,9 @@ def _catalog(connection, snapshot, recipe_ids):
             lines.append(IngredientLine(line["line_no"], line["ingredient_id"],
                 ingredient["canonical_name"] if ingredient else None, form["form_code"] if form else None,
                 line["amount_kind"], line["amount_min"], line["amount_max"], unit["code"] if unit else None,
-                line["measurement_basis"], line["purpose"], review, line["scaling_mode"], proof("scaling", ref)))
+                measurement_basis=line["measurement_basis"], purpose=line["purpose"],
+                requirement=line["requirement"], review=review, scaling_mode=line["scaling_mode"],
+                scaling_review=proof("scaling", ref)))
         content_review = proof("recipe_content", f"revision:{row['id']}")
         if not row["title"].strip() or not row["instructions"].strip():
             content_review = Review()

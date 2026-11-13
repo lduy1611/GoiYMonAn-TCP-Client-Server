@@ -25,7 +25,7 @@ def test_meal_page_and_home_link_preserve_existing_routes(meal_web):
     web, _ = meal_web
     page = web.get("/meal-plan")
     assert page.status_code == 200 and 'data-classification-version="meal-categories-v1"' in page.text
-    assert 'id="meal-form"' in page.text and '/static/meal-plan-v2.js?v=meal-shopping-20261110-3' in page.text
+    assert 'id="meal-form"' in page.text and '/static/meal-plan-v2.js?v=beverage-cards-20261113-2' in page.text
     assert 'id="meal-count-main"' in page.text and 'id="meal-custom-layout"' in page.text
     assert 'id="meal-structure"' not in page.text
     assert 'meal-pref-occasion' not in page.text and 'Ngân sách' not in page.text and 'Dịp ăn' not in page.text

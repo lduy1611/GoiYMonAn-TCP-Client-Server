@@ -48,7 +48,7 @@ def _positive_decimal(value):
 
 def validate_save(payload,request_id,*,update=False,allow_repeated=False,unified=False):
     required={"title","description","instructions","minutes","ingredients","role"}
-    structured={"servings","minutes_prep","minutes_cook","steps","source_url","tags"} if unified else set()
+    structured={"servings","minutes_prep","minutes_cook","steps","source_url","tags","portion_data_status","portion_data_evidence","beverage_temperature","beverage_light","is_non_alcoholic","is_visible"} if unified else set()
     identity={"recipe_id","revision_id","expected_version"} if update else {"idempotency_key"}
     required_fields=required|identity
     allowed=required_fields|structured
@@ -76,6 +76,13 @@ def validate_save(payload,request_id,*,update=False,allow_repeated=False,unified
     source_url=payload.get("source_url")
     tags=payload.get("tags")
     if unified:
+        review_status = payload.get("portion_data_status")
+        review_evidence = payload.get("portion_data_evidence")
+        if review_status is not None:
+            if review_status not in {"verified", "estimated", "needs_review"}:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid portion review status", request_id)
+            if not isinstance(review_evidence, str) or len(review_evidence) > 2000 or (review_status != "needs_review" and not review_evidence.strip()):
+                raise ProtocolError("INVALID_PAYLOAD", "portion review requires evidence", request_id)
         if servings is not None and (not _positive_decimal(servings) or Decimal(servings)>1000):
             raise ProtocolError("INVALID_PAYLOAD","invalid base servings",request_id)
         for value in (minutes_prep, minutes_cook):
@@ -184,6 +191,12 @@ def validate_save(payload,request_id,*,update=False,allow_repeated=False,unified
          "minutes":minutes,"ingredients":lines,"role":role}
     if unified:
         out.update(servings=servings,minutes_prep=minutes_prep,minutes_cook=minutes_cook,steps=steps)
+        from source.server.beverages import validate_settings
+        try:out.update(validate_settings(payload,role))
+        except ValueError as exc:raise ProtocolError("INVALID_PAYLOAD",str(exc),request_id) from None
+        if payload.get("portion_data_status") is not None:
+            out["portion_data_status"]=review_status
+            out["portion_data_evidence"]=review_evidence.strip()
         if "source_url" in payload:out["source_url"]=source_url
         if "tags" in payload:out["tags"]=tags
     if update:out.update(recipe_id=payload["recipe_id"],revision_id=payload["revision_id"],expected_version=payload["expected_version"])

@@ -1,0 +1,4 @@
+"issue_id","legacy_recipe_id","title","component_text_from_instruction","instruction_anchor","existing_relation_for_component","quantity_proposed","ingredient_id_proposed","required_proposed","status","action"
+"P-GAP-01","5","Rau muống xào tỏi","dầu","Bước 2: Phi tỏi với dầu nóng đến khi thơm.","NO_MATCHING_RELATION","","","","NEEDS_VERIFICATION","Xác minh loại dầu, lượng, vai trò và khẩu phần với người viết/nguồn cụ thể; chưa thêm vào 51 dòng."
+"P-GAP-02","28","Canh chua cá","rau thơm","Bước 3: Nêm nước mắm, thêm cà chua và rau thơm rồi tắt bếp.","NO_MATCHING_RELATION","","","","NEEDS_VERIFICATION","Xác minh từng loại rau, lượng và required/optional; chưa tự ánh xạ sang ID Rau thơm hoặc tạo dòng."
+

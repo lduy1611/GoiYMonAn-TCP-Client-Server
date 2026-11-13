@@ -15,7 +15,7 @@ import mysql.connector
 from source.common.catalog_ids import MAX_PUBLIC_ID, UINT32_MAX, V2_OFFSET, valid_public_id
 from source.database.unified_catalog_migration import UnifiedRepository as UnifiedReadRepository, _hash, _norm, _query
 from source.server.repository import (
-    AdminDraftConflict, AdminIngredientConflict, MySQLRepository,
+    AdminDraftConflict, AdminIngredientConflict, AdminTaxonomyConflict, MySQLRepository,
     UserAccountConflict, UserAccountUnauthorized,
 )
 
@@ -85,9 +85,13 @@ class UnifiedMySQLRepository(MySQLRepository):
         ingredients = _query(connection, """SELECT ingredient_id,name,normalized_name,is_active
             FROM ingredients ORDER BY ingredient_id""")
         images = _query(connection, "SELECT recipe_id,sha256 FROM recipe_images ORDER BY recipe_id")
+        meal_tags = _query(connection, """SELECT l.recipe_id,t.tag_type,t.code
+            FROM recipe_tag_links l JOIN recipe_tags t USING(tag_id)
+            WHERE t.deleted_at IS NULL ORDER BY l.recipe_id,t.tag_type,t.code""")
         source = self.unified.dataset_version(connection)
         return "unified:" + _hash({"source": source, "recipes": recipes,
-                                    "ingredients": ingredients, "images": images})[:24]
+                                    "ingredients": ingredients, "images": images,
+                                    "meal_tags": meal_tags})[:24]
 
     def recipes_for_ranking(self, connection):
         return self.unified.recipes_for_ranking(connection)
@@ -164,7 +168,7 @@ class UnifiedMySQLRepository(MySQLRepository):
             return Catalog(available=False, unavailable_reason="STRUCTURED_PORTION_DATA_UNAVAILABLE",
                            trust_admin_catalog=True)
         marks = ",".join(["%s"] * len(recipe_ids))
-        recipe_rows = _query(connection, f"""SELECT recipe_id,edit_version,servings,is_public,deleted_at
+        recipe_rows = _query(connection, f"""SELECT *
             FROM recipes WHERE recipe_id IN ({marks})""", tuple(recipe_ids))
         by_id = {int(row["recipe_id"]): row for row in recipe_rows}
         line_rows = _query(connection, f"""SELECT ri.recipe_id,ri.line_no,ri.ingredient_id,i.name,
@@ -198,7 +202,8 @@ class UnifiedMySQLRepository(MySQLRepository):
             servings = row["servings"]
             revisions[rid] = Revision(recipe_id=rid, revision_id=int(row["edit_version"]),
                 base_servings=str(servings) if servings is not None else None, serving_basis="source_servings",
-                lines=tuple(grouped[rid]), content_complete=bool(grouped[rid]))
+                lines=tuple(grouped[rid]), content_complete=bool(grouped[rid]), role=row["role"] or "main",
+                data_status=row.get("portion_data_status", "needs_review"), data_evidence=row.get("portion_data_evidence") or "")
         return Catalog(revisions=revisions, units=units, available=True, trust_admin_catalog=True)
 
     def admin_list_units(self, connection):
@@ -213,6 +218,208 @@ class UnifiedMySQLRepository(MySQLRepository):
     def meal_classification_for_connection(self, connection, classification):
         return self.unified.meal_classification(connection)
 
+    def daily_prominent_ingredients(self, connection, recipe_ids):
+        """Read recipe ingredient roles for daily pairing, without changing tags."""
+        ids = sorted({int(recipe_id) for recipe_id in recipe_ids})
+        if not ids:
+            return {}
+        marks = ",".join(["%s"] * len(ids))
+        rows = _query(connection, f"""SELECT ri.recipe_id,ri.ingredient_id,i.name
+            FROM recipe_ingredients ri JOIN ingredients i USING(ingredient_id)
+            WHERE ri.recipe_id IN ({marks}) AND ri.purpose='main'
+              AND ri.requirement='required'""", tuple(ids))
+        # Some imported recipes call garlic/water 'main'. Ignore common cooking
+        # adjuncts by ingredient identity, never by a substring in a dish title.
+        adjuncts = {"muoi","duong","toi","hanh","hanh la","hanh tim","hanh kho","hanh tay",
+            "gung","sa","ot","tieu","tieu den","nuoc","nuoc loc","nuoc soi",
+            "nuoc lanh","nuoc mam","nuoc mam chay","nuoc tuong","xi dau",
+            "dau an","dau me","hat nem","hat nem chay","bot ngot","bot canh"}
+        result = {}
+        for row in rows:
+            name = "".join(c for c in unicodedata.normalize("NFD", row["name"].casefold().replace("đ","d"))
+                           if unicodedata.category(c) != "Mn")
+            if name.strip() not in adjuncts:
+                result.setdefault(int(row["recipe_id"]), set()).add(int(row["ingredient_id"]))
+        return result
+
+    def meal_pairing_metadata(self, connection, recipe_ids):
+        """Return only active Admin-managed pairing tags for the requested recipes."""
+        ids = sorted({int(recipe_id) for recipe_id in recipe_ids})
+        if not ids:
+            return {}
+        marks = ",".join(["%s"] * len(ids))
+        rows = _query(connection, f"""SELECT l.recipe_id,t.tag_type,t.code
+            FROM recipe_tag_links l JOIN recipe_tags t USING(tag_id)
+            JOIN recipes r USING(recipe_id)
+            WHERE l.recipe_id IN ({marks}) AND r.is_public=1 AND r.deleted_at IS NULL
+              AND t.deleted_at IS NULL
+              AND t.tag_type IN ('main_ingredient','cooking_method','dish_type','weather','occasion')
+            ORDER BY l.recipe_id,t.tag_type,t.code""", tuple(ids))
+        result = {}
+        for row in rows:
+            result.setdefault(int(row["recipe_id"]), {}).setdefault(row["tag_type"], set()).add(row["code"])
+        return {recipe_id: {group: frozenset(codes) for group, codes in groups.items()}
+                for recipe_id, groups in result.items()}
+
+    def beverage_metadata(self, connection, recipe_ids):
+        ids=sorted(set(recipe_ids))
+        if not ids:return {}
+        marks=','.join(['%s']*len(ids))
+        rows=_query(connection,f"""SELECT l.recipe_id,t.tag_type,t.code FROM recipe_tag_links l
+            JOIN recipe_tags t USING(tag_id) JOIN recipes r USING(recipe_id)
+            WHERE r.role='drink' AND r.is_public=1 AND r.deleted_at IS NULL
+            AND t.deleted_at IS NULL AND l.recipe_id IN ({marks})
+            AND t.tag_type IN ('season','dish_type')""",tuple(ids))
+        result={}
+        for row in rows:result.setdefault(int(row['recipe_id']),{}).setdefault(row['tag_type'],set()).add(row['code'])
+        return result
+
+    def admin_list_taxonomies(self, connection, payload):
+        from source.server.admin_taxonomies import GROUPS
+        groups = sorted(GROUPS[payload["kind"]])
+        marks = ",".join(["%s"] * len(groups))
+        where = [f"t.tag_type IN ({marks})"]
+        args = list(groups)
+        if payload["group"] is not None:
+            where.append("t.tag_type=%s")
+            args.append(payload["group"])
+        if payload["status"] == "active":
+            where.append("t.deleted_at IS NULL")
+        elif payload["status"] == "deleted":
+            where.append("t.deleted_at IS NOT NULL")
+        if payload["query"].strip():
+            needle = f"%{payload['query'].strip().casefold()}%"
+            where.append("(LOWER(t.label) LIKE %s OR LOWER(CONVERT(t.code USING utf8mb4)) LIKE %s OR LOWER(COALESCE(t.description,'')) LIKE %s)")
+            args.extend((needle, needle, needle))
+        clause = " WHERE " + " AND ".join(where)
+        total = int(_query(connection, "SELECT COUNT(*) n FROM recipe_tags t" + clause, tuple(args))[0]["n"])
+        rows = _query(connection, """SELECT t.tag_id,t.tag_type,t.code,t.label,t.description,t.is_core,t.deleted_at,
+                COUNT(DISTINCT l.recipe_id) AS recipe_count
+            FROM recipe_tags t LEFT JOIN recipe_tag_links l ON l.tag_id=t.tag_id""" + clause +
+            " GROUP BY t.tag_id ORDER BY t.tag_type,t.normalized_label,t.tag_id LIMIT %s OFFSET %s",
+            (*args, payload["limit"], payload["offset"]))
+        return {"items": [{"tag_id": int(row["tag_id"]), "group": row["tag_type"], "code": row["code"],
+            "label": row["label"], "description": row["description"] or "", "is_core": bool(row["is_core"]),
+            "deleted": row["deleted_at"] is not None, "recipe_count": int(row["recipe_count"])} for row in rows],
+            "total": total, "limit": payload["limit"], "offset": payload["offset"]}
+
+    def admin_save_taxonomy(self, connection, payload):
+        try:
+            if "tag_id" in payload:
+                rows = _query(connection, "SELECT tag_id,tag_type,code,is_core FROM recipe_tags WHERE tag_id=%s FOR UPDATE", (payload["tag_id"],))
+                if not rows:
+                    raise AdminTaxonomyConflict("taxonomy not found")
+                row = rows[0]
+                if (row["tag_type"], row["code"]) != (payload["group"], payload["code"]):
+                    raise AdminTaxonomyConflict("taxonomy group and code cannot be changed after creation")
+                _write(connection, "UPDATE recipe_tags SET label=%s,normalized_label=%s,description=%s WHERE tag_id=%s",
+                    (payload["label"], _norm(payload["label"]), payload["description"] or None, payload["tag_id"]))
+                tag_id = int(payload["tag_id"])
+            else:
+                duplicate = _query(connection,"SELECT tag_id FROM recipe_tags WHERE tag_type=%s AND code=%s FOR UPDATE",
+                                   (payload["group"],payload["code"]))
+                if duplicate:
+                    raise AdminTaxonomyConflict("a taxonomy with this group and code already exists")
+                _, tag_id = _write(connection, """INSERT INTO recipe_tags(tag_type,code,label,normalized_label,description)
+                    VALUES(%s,%s,%s,%s,%s)""", (payload["group"], payload["code"], payload["label"],
+                    _norm(payload["label"]), payload["description"] or None))
+            connection.commit()
+            return {"tag_id": int(tag_id), "group": payload["group"], "code": payload["code"],
+                    "label": payload["label"], "description": payload["description"]}
+        except Exception:
+            connection.rollback()
+            raise
+
+    def admin_set_taxonomy_deleted(self, connection, payload):
+        try:
+            rows = _query(connection, "SELECT tag_id,is_core FROM recipe_tags WHERE tag_id=%s FOR UPDATE", (payload["tag_id"],))
+            if not rows:
+                raise AdminTaxonomyConflict("taxonomy not found")
+            if payload["deleted"] and rows[0]["is_core"]:
+                raise AdminTaxonomyConflict("core dish types cannot be deleted")
+            _write(connection, "UPDATE recipe_tags SET deleted_at=IF(%s,CURRENT_TIMESTAMP(6),NULL) WHERE tag_id=%s",
+                   (payload["deleted"], payload["tag_id"]))
+            connection.commit()
+            return {"tag_id": payload["tag_id"], "deleted": payload["deleted"]}
+        except Exception:
+            connection.rollback()
+            raise
+
+    def admin_delete_taxonomy_permanent(self, connection, tag_id):
+        try:
+            rows = _query(connection, "SELECT tag_id,is_core FROM recipe_tags WHERE tag_id=%s FOR UPDATE", (tag_id,))
+            if not rows:
+                raise AdminTaxonomyConflict("taxonomy not found")
+            if rows[0]["is_core"]:
+                raise AdminTaxonomyConflict("core dish types cannot be deleted")
+            count = int(_query(connection, "SELECT COUNT(*) n FROM recipe_tag_links WHERE tag_id=%s", (tag_id,))[0]["n"])
+            if count:
+                raise AdminTaxonomyConflict(f"taxonomy is still assigned to {count} recipe(s)")
+            _write(connection, "DELETE FROM recipe_tags WHERE tag_id=%s", (tag_id,))
+            connection.commit()
+            return {"tag_id": tag_id, "deleted_permanently": True}
+        except mysql.connector.Error as exc:
+            connection.rollback()
+            if exc.errno in (1451, 1452):
+                raise AdminTaxonomyConflict("taxonomy still has recipe links; no recipe was changed") from exc
+            raise
+        except Exception:
+            connection.rollback()
+            raise
+
+    def admin_get_recipe_taxonomies(self, connection, recipe_id, kind):
+        from source.server.admin_taxonomies import GROUPS
+        if not _query(connection, "SELECT recipe_id FROM recipes WHERE recipe_id=%s", (recipe_id,)):
+            return None
+        groups = sorted(GROUPS[kind])
+        marks = ",".join(["%s"] * len(groups))
+        rows = _query(connection, f"""SELECT t.tag_id,t.tag_type,t.code,t.label,t.description,t.is_core,t.deleted_at,
+                (l.recipe_id IS NOT NULL) AS selected
+            FROM recipe_tags t LEFT JOIN recipe_tag_links l ON l.tag_id=t.tag_id AND l.recipe_id=%s
+            WHERE t.tag_type IN ({marks}) ORDER BY t.tag_type,t.normalized_label,t.tag_id""",
+            (recipe_id, *groups))
+        return {"recipe_id": recipe_id, "items": [{"tag_id": int(row["tag_id"]), "group": row["tag_type"],
+            "code": row["code"], "label": row["label"], "description": row["description"] or "",
+            "is_core": bool(row["is_core"]), "deleted": row["deleted_at"] is not None,
+            "selected": bool(row["selected"])} for row in rows]}
+
+    def admin_set_recipe_taxonomies(self, connection, payload):
+        from source.server.admin_taxonomies import GROUPS
+        try:
+            recipes = _query(connection, "SELECT recipe_id FROM recipes WHERE recipe_id=%s FOR UPDATE", (payload["recipe_id"],))
+            if not recipes:
+                raise AdminTaxonomyConflict("recipe not found")
+            groups = sorted(GROUPS[payload["kind"]])
+            marks = ",".join(["%s"] * len(groups))
+            existing = _query(connection, f"""SELECT t.tag_id,t.tag_type,t.deleted_at
+                FROM recipe_tags t JOIN recipe_tag_links l USING(tag_id)
+                WHERE l.recipe_id=%s AND t.tag_type IN ({marks}) FOR UPDATE""",
+                (payload["recipe_id"], *groups))
+            rows = []
+            if payload["tag_ids"]:
+                ids = payload["tag_ids"]
+                id_marks = ",".join(["%s"] * len(ids))
+                rows = _query(connection, f"SELECT tag_id,tag_type,deleted_at FROM recipe_tags WHERE tag_id IN ({id_marks}) FOR UPDATE", tuple(ids))
+                by_id = {int(row["tag_id"]): row for row in rows}
+                current_ids = {int(row["tag_id"]) for row in existing}
+                if (set(by_id) != set(ids) or any(row["tag_type"] not in groups for row in rows)
+                        or any(row["deleted_at"] is not None and tag_id not in current_ids for tag_id, row in by_id.items())):
+                    raise AdminTaxonomyConflict("only active classifications can be assigned to recipes")
+            _write(connection, f"""DELETE l FROM recipe_tag_links l JOIN recipe_tags t USING(tag_id)
+                WHERE l.recipe_id=%s AND t.tag_type IN ({marks})""", (payload["recipe_id"], *groups))
+            for tag_id in payload["tag_ids"]:
+                _write(connection, "INSERT INTO recipe_tag_links(recipe_id,tag_id) VALUES(%s,%s)", (payload["recipe_id"], tag_id))
+            connection.commit()
+            return {"recipe_id": payload["recipe_id"], "kind": payload["kind"], "tag_ids": payload["tag_ids"]}
+        except mysql.connector.Error as exc:
+            connection.rollback()
+            if exc.errno in (1451, 1452):
+                raise AdminTaxonomyConflict("recipe or classification was changed; reload and retry") from exc
+            raise
+        except Exception:
+            connection.rollback()
+            raise
+
     def meal_preference_catalog(self, connection, recipes, classification):
         from source.server.meal_preferences import load
         from dataclasses import replace
@@ -226,7 +433,7 @@ class UnifiedMySQLRepository(MySQLRepository):
         base=load(recipes, names, classification, [row for row in details if row is not None])
         rows=_query(connection,"""SELECT l.recipe_id,t.tag_type,t.code,r.source_url FROM recipe_tag_links l
             JOIN recipe_tags t USING(tag_id) JOIN recipes r USING(recipe_id)
-            WHERE r.is_public=1 AND r.deleted_at IS NULL
+            WHERE r.is_public=1 AND r.deleted_at IS NULL AND t.deleted_at IS NULL
               AND t.tag_type IN ('diet','region','occasion')
             ORDER BY t.tag_type,t.code,l.recipe_id""")
         contexts={group:{code:frozenset(ids) for code,ids in codes.items()} for group,codes in base.contexts.items()}
@@ -477,7 +684,7 @@ class UnifiedMySQLRepository(MySQLRepository):
         result = self.admin_set_ingredient_active(payload)
         return {**result, "source": "UNIFIED"}
 
-    def admin_list_recipes(self, connection, query, limit, offset, *, role=None, visibility=None, max_minutes=None):
+    def admin_list_recipes(self, connection, query, limit, offset, *, role=None, visibility=None, max_minutes=None, portion_filter=None):
         needle = _norm(query.strip())
         sql = "SELECT recipe_id,title,role,minutes_total,is_public,deleted_at,edit_version FROM recipes"
         conditions, args = [], []
@@ -488,29 +695,50 @@ class UnifiedMySQLRepository(MySQLRepository):
             conditions.append("role=%s"); args.append(role)
         if max_minutes:
             conditions.append("minutes_total<=%s"); args.append(max_minutes)
+        if portion_filter in {"verified", "estimated", "needs_review"}:
+            conditions.append("portion_data_status=%s"); args.append(portion_filter)
+        elif portion_filter in {"missing", "structured"}:
+            ready = """(servings>0 AND EXISTS(SELECT 1 FROM recipe_ingredients pi WHERE pi.recipe_id=recipes.recipe_id)
+                AND NOT EXISTS(SELECT 1 FROM recipe_ingredients pi WHERE pi.recipe_id=recipes.recipe_id
+                AND (pi.amount_min IS NULL OR pi.unit_id IS NULL OR pi.measurement_basis='unknown'
+                OR pi.purpose='unknown' OR pi.scaling_mode='unknown')))"""
+            conditions.append(ready if portion_filter == "structured" else "NOT COALESCE("+ready+",0)")
         if visibility == "visible": conditions.append("is_public=1 AND deleted_at IS NULL")
         elif visibility == "hidden": conditions.append("is_public=0 AND deleted_at IS NULL")
         elif visibility == "deleted": conditions.append("deleted_at IS NOT NULL")
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
         total = int(_query(connection, "SELECT COUNT(*) n FROM recipes" + where, tuple(args))[0]["n"])
         rows = _query(connection, sql + where + " ORDER BY recipe_id LIMIT %s OFFSET %s", (*args, limit, offset))
+        recipe_ids = [int(row["recipe_id"]) for row in rows]
+        mapped_ids, achievement_counts = set(), {}
+        if recipe_ids:
+            marks = ",".join(["%s"] * len(recipe_ids))
+            mapped_ids = {int(item["recipe_id"]) for item in _query(
+                connection, f"SELECT recipe_id FROM recipe_id_map WHERE recipe_id IN ({marks})", tuple(recipe_ids))}
+            count_rows = _query(connection, f"""SELECT p.recipe_id,
+                    COUNT(DISTINCT p.post_id) AS post_count,
+                    COUNT(DISTINCT c.comment_id) AS comment_count,
+                    COUNT(DISTINCT i.image_id) AS image_count
+                FROM achievement_posts p
+                LEFT JOIN achievement_comments c ON c.post_id=p.post_id
+                LEFT JOIN achievement_images i ON i.post_id=p.post_id
+                WHERE p.recipe_id IN ({marks})
+                GROUP BY p.recipe_id""", tuple(recipe_ids))
+            achievement_counts = {int(item["recipe_id"]): item for item in count_rows}
         items = []
         for row in rows:
             rid = int(row["recipe_id"])
-            mapped = bool(_query(connection, "SELECT 1 FROM recipe_id_map WHERE recipe_id=%s LIMIT 1", (rid,)))
             deleted = row["deleted_at"] is not None
-            can_permanently_delete = deleted and rid > UINT32_MAX and not mapped
-            if deleted and rid <= UINT32_MAX:
-                delete_block_reason = "Món legacy được bảo vệ; không thể xóa vĩnh viễn qua Admin."
-            elif deleted and mapped:
-                delete_block_reason = "Món có ánh xạ định danh cần giữ để bảo toàn dữ liệu."
-            else:
-                delete_block_reason = None
+            counts = achievement_counts.get(rid, {})
             items.append({"recipe_id": rid, "title": row["title"], "role": row["role"],
                           "minutes": int(row["minutes_total"]), "visible": bool(row["is_public"]),
                           "deleted": deleted, "legacy": rid <= UINT32_MAX,
-                          "can_permanently_delete": can_permanently_delete,
-                          "permanent_delete_block_reason": delete_block_reason,
+                          "can_permanently_delete": deleted,
+                          "permanent_delete_block_reason": None,
+                          "has_identity_mapping": rid in mapped_ids,
+                          "achievement_post_count": int(counts.get("post_count", 0)),
+                          "achievement_comment_count": int(counts.get("comment_count", 0)),
+                          "achievement_image_count": int(counts.get("image_count", 0)),
                           "has_override": True, "status": "PUBLISHED" if row["is_public"] else "HIDDEN",
                           "revision_no": int(row["edit_version"]), "revision_id": rid,
                           "edit_revision_id": rid, "edit_version": self._version(connection, rid)})
@@ -534,10 +762,10 @@ class UnifiedMySQLRepository(MySQLRepository):
         if row is None:
             return None
         steps = _query(connection, "SELECT step_no,instruction,duration_minutes,heat_level FROM recipe_steps WHERE recipe_id=%s ORDER BY step_no", (recipe_id,))
-        tags=_query(connection,"SELECT t.tag_type,t.code FROM recipe_tag_links l JOIN recipe_tags t USING(tag_id) WHERE l.recipe_id=%s ORDER BY t.tag_type,t.code",(recipe_id,))
+        tags=_query(connection,"SELECT t.tag_type,t.code FROM recipe_tag_links l JOIN recipe_tags t USING(tag_id) WHERE l.recipe_id=%s AND t.deleted_at IS NULL ORDER BY t.tag_type,t.code",(recipe_id,))
         return _hash({"recipe": {key: row[key] for key in ("recipe_id", "title", "description", "role", "minutes_total", "minutes_prep", "minutes_cook", "servings", "instructions_legacy", "fallback_image_url", "source_url", "is_public", "deleted_at", "edit_version")},
                       "lines": [{key: line[key] for key in ("line_no", "ingredient_id", "name", "quantity_text", "requirement", "amount_kind", "amount_min", "amount_max", "unit_id", "unit_code", "purpose", "ingredient_form", "measurement_basis", "scaling_mode")} for line in lines],
-                      "steps": steps,"tags":tags})
+                      "steps": steps,"tags":tags,"portion_review": [row.get("portion_data_status"), row.get("portion_data_evidence")]})
 
     def _record_history(self, connection, recipe_id):
         row, lines = self._recipe_rows(connection, recipe_id)
@@ -554,6 +782,7 @@ class UnifiedMySQLRepository(MySQLRepository):
                 for line in lines],
             "steps": _query(connection, "SELECT step_no,instruction,duration_minutes,heat_level FROM recipe_steps WHERE recipe_id=%s ORDER BY step_no", (recipe_id,)),
         }
+        snapshot["portion_review"] = {"status":row.get("portion_data_status", "needs_review"), "evidence":row.get("portion_data_evidence") or ""}
         image = _query(connection, "SELECT storage_key,media_type,byte_size,width,height,sha256 FROM recipe_images WHERE recipe_id=%s", (recipe_id,))
         snapshot["image"] = image[0] if image else None
         _write(connection, """INSERT INTO recipe_edit_history(recipe_id,edit_version,actor_user_id,snapshot)
@@ -573,6 +802,8 @@ class UnifiedMySQLRepository(MySQLRepository):
                 "minutes": int(row["minutes_total"]), "minutes_prep": row["minutes_prep"],
                 "minutes_cook": row["minutes_cook"], "servings": str(row["servings"]) if row["servings"] is not None else None,
                 "role": row["role"], "source_url":row["source_url"], "tags":tags,
+                "portion_data_status": row.get("portion_data_status", "needs_review"),
+                "portion_data_evidence": row.get("portion_data_evidence") or "",
                 "status": "PUBLISHED" if row["is_public"] else "HIDDEN",
                 "content_complete": True, "edit_version": self._version(connection, recipe_id),
                 "ingredients": [{"line_no": int(line["line_no"]), "ingredient_id": int(line["ingredient_id"]),
@@ -635,7 +866,25 @@ class UnifiedMySQLRepository(MySQLRepository):
                 (recipe_id,int(step.get("step_no",index)),step["instruction"],step.get("duration_minutes"),step.get("heat_level")))
 
     def _recipe_payload_hash(self, payload):
-        return _hash({key: payload.get(key) for key in ("title", "description", "instructions", "minutes", "role", "ingredients", "servings", "minutes_prep", "minutes_cook", "steps", "source_url", "tags")})
+        from source.server.beverages import FIELDS
+        data={key: payload.get(key) for key in ("title", "description", "instructions", "minutes", "role", "ingredients", "servings", "minutes_prep", "minutes_cook", "steps", "source_url", "tags", "portion_data_status", "portion_data_evidence")}
+        data.update({key:payload[key] for key in FIELDS if key in payload})
+        return _hash(data)
+
+    @staticmethod
+    def _save_beverage_tags(connection, recipe_id, payload):
+        from source.server.beverages import tag_changes,TAG_LABELS
+        for code,enabled in tag_changes(payload).items():
+            rows=_query(connection,"SELECT tag_id,deleted_at FROM recipe_tags WHERE tag_type='dish_type' AND code=%s FOR UPDATE",(code,))
+            if not enabled:
+                if rows:_write(connection,"DELETE FROM recipe_tag_links WHERE recipe_id=%s AND tag_id=%s",(recipe_id,rows[0]['tag_id']))
+                continue
+            if rows and rows[0]['deleted_at'] is not None:raise AdminDraftConflict('beverage tag is deleted; restore it before use')
+            if not rows:
+                label=TAG_LABELS[code]
+                _write(connection,"INSERT INTO recipe_tags(tag_type,code,label,normalized_label) VALUES('dish_type',%s,%s,%s)",(code,label,_norm(label)))
+                rows=_query(connection,"SELECT tag_id FROM recipe_tags WHERE tag_type='dish_type' AND code=%s",(code,))
+            _write(connection,"INSERT IGNORE INTO recipe_tag_links(recipe_id,tag_id) VALUES(%s,%s)",(recipe_id,rows[0]['tag_id']))
 
     @staticmethod
     def _replace_recipe_tags(connection, recipe_id, tags):
@@ -649,11 +898,20 @@ class UnifiedMySQLRepository(MySQLRepository):
             _write(connection,"""INSERT INTO recipe_tags(tag_type,code,label,normalized_label)
                 VALUES(%s,%s,%s,%s) ON DUPLICATE KEY UPDATE label=VALUES(label),normalized_label=VALUES(normalized_label)""",
                 (group,code,label,_norm(label)))
-        _write(connection,"DELETE FROM recipe_tag_links WHERE recipe_id=%s",(recipe_id,))
+        managed_groups = tuple(labels)
+        marks = ",".join(["%s"] * len(managed_groups))
+        _write(connection,f"""DELETE l FROM recipe_tag_links l JOIN recipe_tags t USING(tag_id)
+            WHERE l.recipe_id=%s AND t.tag_type IN ({marks})""",(recipe_id,*managed_groups))
         for tag in tags:
             rows=_query(connection,"SELECT tag_id FROM recipe_tags WHERE tag_type=%s AND code=%s FOR UPDATE",
                         (tag["tag_type"],tag["code"]))
             _write(connection,"INSERT INTO recipe_tag_links(recipe_id,tag_id) VALUES(%s,%s)",(recipe_id,int(rows[0]["tag_id"])))
+
+    @staticmethod
+    def _sync_core_dish_type(connection, recipe_id, role):
+        rows=_query(connection,"SELECT tag_id FROM recipe_tags WHERE tag_type='dish_type' AND code=%s AND is_core=TRUE FOR UPDATE",(role,))
+        if rows:
+            _write(connection,"INSERT IGNORE INTO recipe_tag_links(recipe_id,tag_id) VALUES(%s,%s)",(recipe_id,int(rows[0]["tag_id"])))
 
     def admin_save_recipe(self, payload, author_ref):
         connection = self.connect()
@@ -682,13 +940,14 @@ class UnifiedMySQLRepository(MySQLRepository):
                 _write(connection, """INSERT INTO recipes(recipe_id,title,normalized_title,description,role,minutes_total,
                     minutes_prep,minutes_cook,servings,instructions_legacy,source_url,is_public,edit_version,created_by,updated_by,
                     create_request_key,create_payload_hash)
-                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,1,NULL,NULL,%s,%s)""",
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,NULL,NULL,%s,%s)""",
                     (recipe_id, payload["title"], _norm(payload["title"]), payload["description"], payload["role"],
                      payload["minutes"],payload.get("minutes_prep"),payload.get("minutes_cook"),payload.get("servings"),
-                     payload["instructions"],payload.get("source_url"), key, digest))
+                     payload["instructions"],payload.get("source_url"),int(payload.get('is_visible',True)), key, digest))
                 self._insert_lines(connection, recipe_id, payload["ingredients"])
                 self._replace_steps(connection, recipe_id, payload["instructions"], payload.get("steps"))
                 if payload.get("tags") is not None:self._replace_recipe_tags(connection,recipe_id,payload["tags"])
+                self._sync_core_dish_type(connection, recipe_id, payload["role"])
             else:
                 recipe_id = int(payload["recipe_id"])
                 row = _query(connection, "SELECT edit_version,deleted_at FROM recipes WHERE recipe_id=%s FOR UPDATE", (recipe_id,))
@@ -712,6 +971,11 @@ class UnifiedMySQLRepository(MySQLRepository):
                 self._insert_lines(connection, recipe_id, payload["ingredients"], old_lines)
                 self._replace_steps(connection, recipe_id, payload["instructions"], payload.get("steps"))
                 if payload.get("tags") is not None:self._replace_recipe_tags(connection,recipe_id,payload["tags"])
+                self._sync_core_dish_type(connection, recipe_id, payload["role"])
+            if payload.get("portion_data_status") is not None:
+                _write(connection, "UPDATE recipes SET portion_data_status=%s,portion_data_evidence=%s WHERE recipe_id=%s",
+                       (payload["portion_data_status"],payload.get("portion_data_evidence") or "",recipe_id))
+            if payload['role']=='drink':self._save_beverage_tags(connection,recipe_id,payload)
             connection.commit()
             return {"recipe_id": recipe_id, "revision_id": recipe_id, "created": "recipe_id" not in payload}
         except mysql.connector.Error as exc:
@@ -768,27 +1032,42 @@ class UnifiedMySQLRepository(MySQLRepository):
             connection.rollback(); raise
         finally: connection.close()
 
-    def admin_permanently_delete_recipe(self, recipe_id):
-        """Purge only a soft-deleted, unmapped unified recipe and its owned rows."""
+    def admin_permanently_delete_recipe(self, recipe_id, *, confirm_user_content_delete,
+                                        expected_achievement_counts):
+        """Atomically purge a soft-deleted recipe and explicitly confirmed user content."""
         connection = self.connect()
         try:
             connection.start_transaction()
             rows = _query(connection, "SELECT recipe_id,deleted_at FROM recipes WHERE recipe_id=%s FOR UPDATE", (recipe_id,))
             if not rows:
-                raise AdminDraftConflict("recipe not found")
+                raise AdminDraftConflict("M\u00f3n c\u1ea7n x\u00f3a kh\u00f4ng c\u00f2n t\u1ed3n t\u1ea1i.")
             if rows[0]["deleted_at"] is None:
-                raise AdminDraftConflict("move the recipe to Deleted before permanent deletion")
-            if recipe_id <= UINT32_MAX:
-                raise AdminDraftConflict("legacy recipe rows are protected from permanent deletion")
-            if _query(connection, "SELECT 1 FROM recipe_id_map WHERE recipe_id=%s LIMIT 1 FOR UPDATE", (recipe_id,)):
-                raise AdminDraftConflict("recipe has an import identity mapping and is protected")
-            images = _query(connection, "SELECT storage_key FROM recipe_images WHERE recipe_id=%s FOR UPDATE", (recipe_id,))
-            for table in ("recipe_ingredients", "recipe_steps", "recipe_tag_links", "recipe_images", "recipe_edit_history"):
+                raise AdminDraftConflict("H\u00e3y x\u00f3a m\u1ec1m m\u00f3n tr\u01b0\u1edbc khi x\u00f3a v\u0129nh vi\u1ec5n.")
+
+            posts = _query(connection, "SELECT post_id FROM achievement_posts WHERE recipe_id=%s ORDER BY post_id FOR UPDATE", (recipe_id,))
+            post_ids = [int(item["post_id"]) for item in posts]
+            comments, achievement_images = [], []
+            if post_ids:
+                marks = ",".join(["%s"] * len(post_ids))
+                comments = _query(connection, f"SELECT comment_id FROM achievement_comments WHERE post_id IN ({marks}) ORDER BY comment_id FOR UPDATE", tuple(post_ids))
+                achievement_images = _query(connection, f"SELECT image_id,storage_key FROM achievement_images WHERE post_id IN ({marks}) ORDER BY image_id FOR UPDATE", tuple(post_ids))
+            actual_counts = {"posts": len(post_ids), "comments": len(comments), "images": len(achievement_images)}
+            if actual_counts != expected_achievement_counts:
+                raise AdminDraftConflict("N\u1ed9i dung Th\u00e0nh qu\u1ea3 \u0111\u00e3 thay \u0111\u1ed5i. T\u1ea3i l\u1ea1i danh s\u00e1ch v\u00e0 x\u00e1c nh\u1eadn l\u1ea1i.")
+            if any(actual_counts.values()) and not confirm_user_content_delete:
+                raise AdminDraftConflict("M\u00f3n c\u00f2n b\u00e0i Th\u00e0nh qu\u1ea3, b\u00ecnh lu\u1eadn ho\u1eb7c \u1ea3nh ng\u01b0\u1eddi d\u00f9ng; c\u1ea7n x\u00e1c nh\u1eadn ri\u00eang.")
+
+            recipe_images = _query(connection, "SELECT storage_key FROM recipe_images WHERE recipe_id=%s FOR UPDATE", (recipe_id,))
+            if post_ids:
+                _write(connection, "DELETE FROM achievement_posts WHERE recipe_id=%s", (recipe_id,))
+            for table in ("recipe_ingredients", "recipe_steps", "recipe_tag_links", "recipe_images",
+                          "recipe_edit_history", "recipe_id_map"):
                 _write(connection, f"DELETE FROM {table} WHERE recipe_id=%s", (recipe_id,))
             _write(connection, "DELETE FROM recipes WHERE recipe_id=%s AND deleted_at IS NOT NULL", (recipe_id,))
             connection.commit()
-            return {"recipe_id": recipe_id, "deleted": True,
-                    "previous_image_key": images[0]["storage_key"] if images else None}
+            return {"recipe_id": recipe_id, "deleted": True, "achievement_counts": actual_counts,
+                    "recipe_image_keys": [item["storage_key"] for item in recipe_images],
+                    "achievement_image_keys": [item["storage_key"] for item in achievement_images]}
         except Exception:
             connection.rollback(); raise
         finally:
@@ -918,6 +1197,104 @@ class UnifiedMySQLRepository(MySQLRepository):
             JOIN recipes r ON r.recipe_id=p.recipe_id
             WHERE i.storage_key=%s""" + visibility, (storage_key,))
         return {key: rows[0][key] for key in ("storage_key", "media_type", "byte_size", "width", "height", "sha256")} if rows else None
+
+    @staticmethod
+    def _feedback_row(row):
+        result = {"feedback_id": str(row["feedback_id"]), "category": row["category"],
+                  "content": row["content"], "status": row["status"],
+                  "username": row.get("username") or "Khách", "created_at": row["created_at"].isoformat(),
+                  "image": None}
+        if row.get("image_storage_key"):
+            result["image"] = {"storage_key": row["image_storage_key"], "media_type": row["image_media_type"],
+                "byte_size": int(row["image_byte_size"]), "width": int(row["image_width"]),
+                "height": int(row["image_height"]), "sha256": row["image_sha256"]}
+        return result
+
+    def feedback_create(self, payload):
+        connection = self.connect()
+        try:
+            connection.start_transaction()
+            prior = _query(connection, "SELECT feedback_id FROM feedback_submissions WHERE request_key=%s FOR UPDATE",
+                           (payload["request_key"],))
+            if prior:
+                connection.commit()
+                return {"feedback_id": str(prior[0]["feedback_id"]), "created": False}
+            image = payload["image"]
+            _write(connection, """INSERT INTO feedback_submissions
+                (user_id,category,content,request_key,image_storage_key,image_media_type,image_byte_size,image_width,image_height,image_sha256)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (payload.get("user_id"), payload["category"], payload["content"], payload["request_key"],
+                 image["storage_key"] if image else None, image["media_type"] if image else None,
+                 image["byte_size"] if image else None, image["width"] if image else None,
+                 image["height"] if image else None, image["sha256"] if image else None))
+            feedback_id = _query(connection, "SELECT feedback_id FROM feedback_submissions WHERE request_key=%s",
+                                 (payload["request_key"],))[0]["feedback_id"]
+            connection.commit()
+            return {"feedback_id": str(feedback_id), "created": True}
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def feedback_admin_list(self, connection, status, limit, offset):
+        where, args = (" WHERE f.status=%s", [status]) if status != "all" else ("", [])
+        total = int(_query(connection, "SELECT COUNT(*) AS n FROM feedback_submissions f" + where, tuple(args))[0]["n"])
+        rows = _query(connection, """SELECT f.feedback_id,f.category,f.content,f.status,f.created_at,
+            u.username,f.image_storage_key,f.image_media_type,f.image_byte_size,f.image_width,f.image_height,f.image_sha256
+            FROM feedback_submissions f LEFT JOIN users u ON u.user_id=f.user_id""" + where +
+            " ORDER BY f.created_at DESC,f.feedback_id DESC LIMIT %s OFFSET %s", (*args, limit, offset))
+        return {"items": [self._feedback_row(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+
+    def feedback_admin_get(self, connection, feedback_id):
+        rows = _query(connection, """SELECT f.feedback_id,f.category,f.content,f.status,f.created_at,
+            u.username,f.image_storage_key,f.image_media_type,f.image_byte_size,f.image_width,f.image_height,f.image_sha256
+            FROM feedback_submissions f LEFT JOIN users u ON u.user_id=f.user_id WHERE f.feedback_id=%s""", (feedback_id,))
+        return self._feedback_row(rows[0]) if rows else None
+
+    def feedback_admin_image(self, connection, storage_key):
+        rows = _query(connection, """SELECT feedback_id,image_storage_key,image_media_type,image_byte_size,
+            image_width,image_height,image_sha256 FROM feedback_submissions WHERE image_storage_key=%s""", (storage_key,))
+        if not rows:
+            return None
+        row = rows[0]
+        return {"feedback_id": str(row["feedback_id"]), "storage_key": row["image_storage_key"],
+            "media_type": row["image_media_type"], "byte_size": int(row["image_byte_size"]),
+            "width": int(row["image_width"]), "height": int(row["image_height"]), "sha256": row["image_sha256"]}
+
+    def feedback_admin_set_status(self, feedback_id, status):
+        connection = self.connect()
+        try:
+            connection.start_transaction()
+            rows = _query(connection, "SELECT feedback_id FROM feedback_submissions WHERE feedback_id=%s FOR UPDATE", (feedback_id,))
+            if not rows:
+                connection.rollback()
+                return None
+            _write(connection, "UPDATE feedback_submissions SET status=%s WHERE feedback_id=%s", (status, feedback_id))
+            connection.commit()
+            return {"feedback_id": str(feedback_id), "status": status}
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def feedback_admin_delete(self, feedback_id):
+        connection = self.connect()
+        try:
+            connection.start_transaction()
+            rows = _query(connection, "SELECT feedback_id,image_storage_key FROM feedback_submissions WHERE feedback_id=%s FOR UPDATE", (feedback_id,))
+            if not rows:
+                connection.rollback()
+                return None
+            _write(connection, "DELETE FROM feedback_submissions WHERE feedback_id=%s", (feedback_id,))
+            connection.commit()
+            return {"feedback_id": str(feedback_id), "image_storage_key": rows[0]["image_storage_key"]}
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def achievement_create_result(self, connection, user_id, request_key):
         rows = _query(connection, "SELECT post_id FROM achievement_posts WHERE user_id=%s AND request_key=%s", (user_id, request_key))
@@ -1060,4 +1437,3 @@ class UnifiedMySQLRepository(MySQLRepository):
 
     def admin_update_draft(self, payload):
         raise AdminDraftConflict("review-based drafts are not part of unified schema v3")
-

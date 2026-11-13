@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 from fractions import Fraction
+import os
 import re
 from typing import Mapping
 
@@ -29,17 +30,42 @@ _NUMBER = re.compile(r"(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,6})?\Z")
 class Options:
     recipe_ids: tuple[int, ...]
     people: int
+    adults: int
+    children: int
+    occasion: str
+    child_equivalent: Fraction
+    layout_mode: str = "automatic"
+
+    @property
+    def equivalent_people(self):
+        return Fraction(self.adults) + self.child_equivalent * self.children
 
 
 def validate(payload: dict, request_id: str | None = None) -> Options:
+    allowed = {"recipe_ids", "people", "adults", "children", "occasion", "layout_mode"}
     ids, people = payload.get("recipe_ids"), payload.get("people")
-    if (set(payload) != {"recipe_ids", "people"} or not isinstance(ids, list)
-            or not 1 <= len(ids) <= MAX_RECIPES
+    adults, children = payload.get("adults"), payload.get("children")
+    occasion = payload.get("occasion", "daily")
+    counts_supplied = "adults" in payload or "children" in payload
+    if (payload.get("layout_mode", "automatic") not in {"automatic", "custom"} or set(payload) - allowed or not {"recipe_ids", "people"} <= set(payload) or not isinstance(ids, list)
+            or not 1 <= len(ids) <= (7 if occasion == "daily" and payload.get("layout_mode", "automatic") == "automatic" else MAX_RECIPES)
             or any(not valid_public_id(i) for i in ids)
             or len(set(ids)) != len(ids) or type(people) is not int
-            or not 1 <= people <= MAX_PEOPLE):
-        raise ProtocolError("INVALID_PAYLOAD", "expected distinct recipe_ids (1..6) and people (1..100)", request_id)
-    return Options(tuple(ids), people)
+            or not 1 <= people <= MAX_PEOPLE
+            or counts_supplied and (type(adults) is not int or type(children) is not int
+                                    or adults < 0 or children < 0 or adults + children != people)
+            or not isinstance(occasion, str) or occasion not in {"daily", "weekend", "guests", "drinking", "snack"}):
+        raise ProtocolError("INVALID_PAYLOAD", "invalid recipe, people, adult/child counts, or occasion", request_id)
+    if not counts_supplied:
+        adults, children = people, 0
+    raw_factor = os.getenv("MEAL_CHILD_EQUIVALENT", "0.6").strip()
+    try:
+        factor = Fraction(raw_factor)
+    except (ValueError, ZeroDivisionError):
+        factor = Fraction(0)
+    if not 0 < factor <= 1:
+        raise ProtocolError("PORTION_CONFIG_INVALID", "MEAL_CHILD_EQUIVALENT must be greater than 0 and at most 1", request_id)
+    return Options(tuple(ids), people, adults, children, occasion, factor, payload.get("layout_mode", "automatic"))
 
 
 @dataclass(frozen=True)
@@ -85,6 +111,9 @@ class Revision:
     content_complete: bool = False
     review: Review = Review()
     servings_review: Review = Review()
+    role: str = "main"
+    data_status: str = "needs_review"
+    data_evidence: str = ""
 
 
 @dataclass(frozen=True)
@@ -133,6 +162,41 @@ MESSAGES = {
     "UNSUPPORTED_SCALING": "Ch\u01b0a c\u00f3 c\u00e1ch t\u00ednh kh\u1ea9u ph\u1ea7n ph\u00f9 h\u1ee3p cho d\u00f2ng n\u00e0y.",
     "RESULT_TOO_LARGE": "K\u1ebft qu\u1ea3 v\u01b0\u1ee3t gi\u1edbi h\u1ea1n TCP; h\u00e3y t\u00ednh v\u1edbi m\u00e2m nh\u1ecf h\u01a1n.",
 }
+MESSAGES["MEAL_ALLOCATION_UNAVAILABLE"] = (
+    "Ch\u01b0a \u0111\u1ee7 \u0111\u1ecbnh l\u01b0\u1ee3ng nguy\u00ean li\u1ec7u ch\u00ednh "
+    "\u0111\u1ec3 ph\u00e2n b\u1ed5 t\u1ed5ng l\u01b0\u1ee3ng cho nh\u00f3m m\u00f3n n\u00e0y.")
+
+# Trial references per adult-equivalent for the whole meal, never per recipe.
+# Values are adjustable assumptions for product testing, not nutrition advice.
+TRIAL_POLICY_VERSION = "meal-v3-trial-1"
+TRIAL_REFERENCES = {
+    "daily": {
+        "main": ("M\u00f3n ch\u00ednh / \u0111\u1ea1m", "150", "g", "mass", "gross"),
+        "vegetable": ("Rau", "180", "g", "mass", "gross"),
+        "starch": ("Tinh b\u1ed9t", "90", "g", "mass", "gross"),
+        "soup": ("N\u01b0\u1edbc canh / l\u1ea9u", "250", "ml", "volume", "gross"),
+        "side": ("M\u00f3n \u0103n k\u00e8m", "80", "g", "mass", "gross"),
+        "drink": ("\u0110\u1ed3 u\u1ed1ng", "250", "ml", "volume", "prepared"),
+    },
+    "guests": {
+        "main": ("M\u00f3n ch\u00ednh / \u0111\u1ea1m", "180", "g", "mass", "gross"),
+        "vegetable": ("Rau", "180", "g", "mass", "gross"),
+        "starch": ("Tinh b\u1ed9t", "100", "g", "mass", "gross"),
+        "soup": ("N\u01b0\u1edbc canh / l\u1ea9u", "300", "ml", "volume", "gross"),
+        "side": ("M\u00f3n \u0103n k\u00e8m", "100", "g", "mass", "gross"),
+        "drink": ("\u0110\u1ed3 u\u1ed1ng", "250", "ml", "volume", "prepared"),
+    },
+    "drinking": {
+        "main": ("M\u00f3n ch\u00ednh / \u0111\u1ea1m", "220", "g", "mass", "gross"),
+        "vegetable": ("Rau", "100", "g", "mass", "gross"),
+        "starch": ("Tinh b\u1ed9t", "40", "g", "mass", "gross"),
+        "soup": ("N\u01b0\u1edbc canh / l\u1ea9u", "0", "ml", "volume", "gross"),
+        "side": ("M\u00f3n chia s\u1ebb / \u0103n k\u00e8m", "180", "g", "mass", "gross"),
+        "drink": ("\u0110\u1ed3 u\u1ed1ng", "350", "ml", "volume", "prepared"),
+    },
+}
+_SAFE_UNIT_FACTORS = {"g": ("g", Fraction(1)), "kg": ("g", Fraction(1000)),
+                      "ml": ("ml", Fraction(1)), "l": ("ml", Fraction(1000))}
 
 
 def _text(value, limit=80):
@@ -182,6 +246,14 @@ def _finite_decimal(value: Fraction):
     return (digits[:-places] + "." + digits[-places:]).rstrip("0").rstrip(".")
 
 
+def _display_decimal(value: Fraction):
+    exact = _finite_decimal(value)
+    if exact is not None:
+        return exact
+    scaled = -(-value.numerator * 10**6 // value.denominator)
+    return _finite_decimal(Fraction(scaled, 10**6))
+
+
 def _quantity(low: Fraction, high: Fraction):
     minimum, maximum = _finite_decimal(low), _finite_decimal(high)
     bounded = minimum is None or maximum is None
@@ -199,17 +271,55 @@ def _reason(code, line_id=None):
     return {"code": code, "message": MESSAGES[code], "line_id": line_id}
 
 
+def _policy_note(options: Options):
+    return (f"Định mức thử nghiệm; trẻ em tính k={_finite_decimal(options.child_equivalent)} suất tương đương "
+            "mỗi trẻ. Đây là giả định cấu hình được, không phải khuyến nghị dinh dưỡng.")
+
+
 def _recipe(recipe_id):
     return {"recipe_id": recipe_id, "revision_id": None, "status": "INCOMPLETE",
             "base_servings": None, "target_servings": None, "lines": [], "reasons": []}
 
 
 def unavailable(options: Options, code="APPROVED_DATA_UNAVAILABLE"):
-    return {"calculation_version": "portion-v1", "recipe_ids": list(options.recipe_ids),
-            "people": options.people, "status": "INCOMPLETE", "totals_complete": False,
+    return {**({"layout_mode":"automatic"} if len(options.recipe_ids) > MAX_RECIPES else {}),
+            "calculation_version": "portion-v1", "recipe_ids": list(options.recipe_ids),
+            "people": options.people, "adults": options.adults, "children": options.children,
+            "child_equivalent": _finite_decimal(options.child_equivalent),
+            "equivalent_people": _finite_decimal(options.equivalent_people), "occasion": options.occasion,
+            "status": "INCOMPLETE", "totals_complete": False,
             "portion_policy_version": None,
             "recipes": [{**_recipe(i), "reasons": [_reason(code)]} for i in options.recipe_ids],
-            "known_ingredients": []}
+            "known_ingredients": [], "portion_groups": [], "policy_note": _policy_note(options)}
+
+
+# Experimental meal contributions, not nutrition or conversions between food units.
+DAILY_CONTRIBUTIONS = {"main": Fraction(55, 100), "vegetable": Fraction(30, 100), "soup": Fraction(15, 100)}
+
+
+def daily_meal_capacity(capacities):
+    return sum((Fraction(str(value)) * DAILY_CONTRIBUTIONS.get(role, 0)
+                for role, value in capacities.items() if value is not None), Fraction(0))
+
+
+def daily_service_verdict(groups, target, capacity, quantities_complete=True):
+    """Describe uncertainty; the experimental weighted index is not people fed."""
+    by_role = {g["role"]: g for g in groups}
+    limitations = []
+    if capacity is None or not quantities_complete:
+        return "unknown", ["Thiếu số suất hoặc định lượng đáng tin cậy để đánh giá cả mâm."]
+    for role, label in (("main", "Món chính"), ("vegetable", "Món rau"), ("soup", "Canh")):
+        value = by_role.get(role, {}).get("source_capacity")
+        if value is None:
+            limitations.append(f"{label}: chưa xác định được đóng góp.")
+        elif Fraction(value) < target:
+            limitations.append(f"{label} có số suất gốc thấp hơn nhu cầu; cần chia phần nhỏ hơn.")
+    main = by_role.get("main", {}).get("source_capacity")
+    if capacity < target or main is None or Fraction(main) < target:
+        return "risk", limitations
+    if capacity > target * Fraction(13, 10):
+        return "surplus", limitations
+    return "conditional", limitations
 
 
 def calculate(options: Options, catalog: Catalog) -> dict:
@@ -223,6 +333,7 @@ def calculate(options: Options, catalog: Catalog) -> dict:
         return unavailable(options, catalog.unavailable_reason or "APPROVED_DATA_UNAVAILABLE")
     result = unavailable(options)
     result["recipes"] = []
+    result["portion_groups"] = []
     grouped = {}
     policy = catalog.portion_policy
     policy_ok = (catalog.trust_admin_catalog is True or
@@ -230,9 +341,132 @@ def calculate(options: Options, catalog: Catalog) -> dict:
                  and _text(policy.version) and all(_id(k) for k in policy.allocations)
                  and set(policy.allocations) == set(options.recipe_ids))
     if policy_ok:
-        result["portion_policy_version"] = policy.version if isinstance(policy, PortionPolicy) else "v3-base-servings"
+        result["portion_policy_version"] = TRIAL_POLICY_VERSION if catalog.trust_admin_catalog else (policy.version if isinstance(policy, PortionPolicy) else "v3-base-servings")
+    trusted = catalog.trust_admin_catalog is True
+    factors = {}
+    group_results = []
+    if trusted:
+        occasion = {"weekend": "daily", "snack": "drinking"}.get(options.occasion, options.occasion)
+        by_role = {}
+        for recipe_id in options.recipe_ids:
+            revision = catalog.revisions.get(recipe_id)
+            if isinstance(revision, Revision):
+                by_role.setdefault(revision.role, []).append((recipe_id, revision))
+        if occasion == "daily":
+            service_groups = []
+            labels = {"main":"M\u00f3n ch\u00ednh", "vegetable":"M\u00f3n rau", "soup":"Canh/L\u1ea9u",
+                      "side":"M\u00f3n \u0103n k\u00e8m", "starch":"Tinh b\u1ed9t", "other":"Nh\u00f3m m\u00f3n kh\u00e1c"}
+            for role, members in by_role.items():
+                capacities = []
+                valid = True
+                for recipe_id, revision in members:
+                    base = _number(revision.base_servings)
+                    if (base is None or revision.data_status not in {"verified", "estimated"}
+                            or revision.serving_basis not in {"source_servings", "adult_equivalent"}):
+                        valid = False
+                        break
+                    capacities.append((recipe_id, revision, base))
+                valid = valid and len({revision.serving_basis for _, revision in members}) == 1
+                source_capacity = sum((base for _, _, base in capacities), Fraction(0)) if valid else None
+                scale = ((options.equivalent_people / source_capacity if options.layout_mode == "custom" else Fraction(1)) if source_capacity else None)
+                status = ("unknown" if scale is None else
+                          "estimated" if any(revision.data_status == "estimated" for _, revision, _ in capacities)
+                          else "verified")
+                recipe_capacity = []
+                for recipe_id, revision in members:
+                    base = _number(revision.base_servings)
+                    if scale is None or base is None:
+                        factors[recipe_id] = Fraction(1)
+                        base_ok = (base is not None and revision.data_status in {"verified", "estimated"}
+                                   and revision.serving_basis in {"source_servings", "adult_equivalent"})
+                        recipe_capacity.append({"recipe_id":recipe_id,
+                            "source_servings":_finite_decimal(base) if base_ok else None,
+                            "target_servings":None,
+                            "status":revision.data_status if base_ok else "unknown"})
+                    else:
+                        factors[recipe_id] = scale
+                        recipe_capacity.append({"recipe_id":recipe_id,
+                            "source_servings":_finite_decimal(base),
+                            "target_servings":_display_decimal(base*scale),
+                            "status":revision.data_status})
+                service_groups.append({"role":role, "label":labels.get(role,"Nh\u00f3m m\u00f3n kh\u00e1c"),
+                    "requested_servings":_finite_decimal(options.equivalent_people),
+                    "source_capacity":_finite_decimal(source_capacity) if source_capacity is not None else None,
+                    "adjustment_factor":_display_decimal(scale) if scale is not None else None,
+                    "status":status, "recipes":recipe_capacity})
+            meal_known = all(g["source_capacity"] is not None and g["role"] in DAILY_CONTRIBUTIONS for g in service_groups)
+            meal_capacity = daily_meal_capacity({g["role"]:g["source_capacity"] for g in service_groups}) if meal_known else None
+            result["service_assessment"]={"method":"source_servings_by_role",
+                "requested_servings":_finite_decimal(options.equivalent_people),
+                "meal_capacity":_finite_decimal(meal_capacity) if meal_capacity is not None and options.layout_mode != "custom" else None,
+                "groups":service_groups,
+                "note":'Quy uoc thu nghiem: chinh 55%, rau 30%, canh 15% cua mot bua; quy doi suat goc theo vai tro, khong cong truc tiep cac nhom. Khong phai danh gia du dinh duong; khong suy ra gam thanh pham khi thieu hao hut.'}
+            result["portion_policy_version"]="daily-source-servings-v1"
+        else:
+            references = TRIAL_REFERENCES[occasion]
+            by_role = {}
+            for recipe_id in options.recipe_ids:
+                revision = catalog.revisions.get(recipe_id)
+                if isinstance(revision, Revision): by_role.setdefault(revision.role, []).append((recipe_id, revision))
+            for role, members in by_role.items():
+                if role not in references:
+                    for recipe_id, _ in members: factors[recipe_id] = None
+                    group_results.append({"role": role, "label": "Nhóm món chưa có định mức",
+                        "target": None, "unit": "g", "measurement_basis": "gross", "status": "INCOMPLETE",
+                        "reason": "Chưa có định mức thử nghiệm cho nhóm món này."})
+                    continue
+                label, ref_amount, target_unit, dimension, basis = references[role]
+                drivers = []
+                reason = None
+                for recipe_id, revision in members:
+                    base = _number(revision.base_servings)
+                    if base is None: reason = "Thiếu số suất gốc."; break
+                    if revision.content_complete is not True: reason = "Danh sách nguyên liệu chưa đầy đủ."; break
+                    if role == "soup":
+                        # A soup's measured broth is a separate volume budget. Solid
+                        # ingredients stay in that recipe and share its scaling factor.
+                        lines = [line for line in revision.lines
+                                 if line.purpose == "main"
+                                 and line.requirement == "required" and line.unit in {"ml", "l"}]
+                    else:
+                        lines = [line for line in revision.lines if line.purpose == "main" and line.requirement == "required"]
+                    if not lines: reason = "Không có nguyên liệu chính bắt buộc được xác định."; break
+                    for line in lines:
+                        unit = line.unit
+                        unit_record = catalog.units.get(unit) if isinstance(unit, str) else None
+                        if (line.amount_kind != "exact" or line.measurement_basis != basis
+                            or line.scaling_mode != "linear" or unit not in _SAFE_UNIT_FACTORS
+                            or _SAFE_UNIT_FACTORS[unit][0] != target_unit
+                            or not isinstance(unit_record, Unit) or unit_record.dimension != dimension):
+                            reason = "Nguyên liệu chính thiếu định lượng/đơn vị/cơ sở đo tương thích."; break
+                        amount = _number(line.amount_min)
+                        if amount is None or _number(line.amount_max) not in {None, amount}:
+                            reason = "Định lượng nguyên liệu chính không phải số chính xác."; break
+                        drivers.append((recipe_id, line, base, amount * _SAFE_UNIT_FACTORS[unit][1]))
+                    if reason: break
+                baseline = sum((amount / base for _, _, base, amount in drivers), Fraction(0))
+                if reason or not drivers or baseline <= 0 or Fraction(ref_amount) == 0:
+                    for recipe_id, _ in members: factors[recipe_id] = None
+                    group_results.append({"role": role, "label": label, "target": "0" if Fraction(ref_amount)==0 else None,
+                        "unit": target_unit, "measurement_basis": basis, "status": "INCOMPLETE",
+                        "reason": reason or "Không có định lượng chính đủ căn cứ."})
+                    continue
+                target = Fraction(ref_amount) * options.equivalent_people
+                shared_factor = target / baseline
+                for recipe_id, revision in members:
+                    base = _number(revision.base_servings)
+                    factors[recipe_id] = shared_factor / base
+                q = _quantity(target, target)
+                group_results.append({"role": role, "label": label, "target": q["quantity_value"], "unit": target_unit,
+                    "measurement_basis": basis, "status": "COMPLETE", "reason": None})
+            result["portion_groups"] = group_results
+            result["portion_policy_version"] = TRIAL_POLICY_VERSION
     for recipe_id in options.recipe_ids:
         item = _recipe(recipe_id)
+        revision = catalog.revisions.get(recipe_id)
+        if revision is not None:
+            item["data_status"] = revision.data_status
+            item["data_evidence"] = revision.data_evidence
         result["recipes"].append(item)
         revision = catalog.revisions.get(recipe_id)
         if not isinstance(revision, Revision) or not _accepted(revision.review, catalog):
@@ -264,13 +498,19 @@ def calculate(options: Options, catalog: Catalog) -> dict:
                 item["reasons"].append(_reason("PORTION_POLICY_MISMATCH"))
             elif _number(allocation.servings_per_person) is None:
                 item["reasons"].append(_reason("INVALID_PORTION_ALLOCATION"))
+        if trusted and recipe_id in factors and factors[recipe_id] is None and not item["reasons"]:
+            item["reasons"].append(_reason("MEAL_ALLOCATION_UNAVAILABLE"))
         # Never scale an incomplete/unapproved recipe basis or a mismatched policy.
         if item["reasons"]:
             continue
         allocation = (policy.allocations[recipe_id] if isinstance(policy, PortionPolicy)
                       else Allocation(revision.revision_id, revision.serving_basis or "source_servings", "1"))
-        target = _number(allocation.servings_per_person) * options.people
-        item["base_servings"], item["target_servings"] = _finite_decimal(base), _finite_decimal(target)
+        target = (_number(allocation.servings_per_person) * options.people if not trusted
+                  else base * factors.get(recipe_id, Fraction(1)))
+        if trusted and factors.get(recipe_id) is None:
+            item["reasons"].append(_reason("MEAL_ALLOCATION_UNAVAILABLE"))
+            continue
+        item["base_servings"], item["target_servings"] = _finite_decimal(base), _display_decimal(target)
         for line in revision.lines:
             code = None
             unit = catalog.units.get(line.unit) if isinstance(line.unit, str) else None
@@ -330,10 +570,28 @@ def calculate(options: Options, catalog: Catalog) -> dict:
             # optional lines must not be inferred as required by a client.
             group["uses"].append({"recipe_id": recipe_id, "revision_id": revision.revision_id,
                                   "line_id": line.line_id, "requirement": line.requirement, **quantity})
+        if trusted and occasion == "daily" and options.layout_mode != "custom":
+            if meal_capacity is None or meal_capacity < options.equivalent_people:
+                item["reasons"].append(_reason("MEAL_ALLOCATION_UNAVAILABLE"))
         item["status"] = "INCOMPLETE" if item["reasons"] else "COMPLETE"
     result["known_ingredients"] = [
         {**{k: v for k, v in group.items() if k not in {"low", "high"}},
          **_quantity(group["low"], group["high"])} for group in grouped.values()]
     result["totals_complete"] = all(item["status"] == "COMPLETE" for item in result["recipes"])
     result["status"] = "COMPLETE" if result["totals_complete"] else "INCOMPLETE"
+    if trusted and occasion == "daily" and options.layout_mode != "custom":
+        assessment = result["service_assessment"]
+        # Ingredient completeness and meal suitability are separate assessments.
+        quantities_complete = all(not any(r["code"] != "MEAL_ALLOCATION_UNAVAILABLE"
+            for r in item["reasons"]) for item in result["recipes"])
+        verdict, limitations = daily_service_verdict(assessment["groups"], options.equivalent_people,
+            Fraction(assessment["meal_capacity"]) if assessment["meal_capacity"] is not None else None,
+            quantities_complete)
+        assessment.update(assessment_status=verdict, limitations=limitations)
+        assessment["note"] = "Chỉ số thử nghiệm = 55% suất chính + 30% suất rau + 15% suất canh. Phần rau nhiều có thể nâng chỉ số dù món chính hoặc canh ít. Đây không phải số người chắc chắn ăn đủ hay đánh giá dinh dưỡng."
+    result["adults"], result["children"] = options.adults, options.children
+    result["child_equivalent"] = _finite_decimal(options.child_equivalent)
+    result["equivalent_people"] = _finite_decimal(options.equivalent_people)
+    result["occasion"] = options.occasion
+    result["policy_note"] = ("Gi? nguy?n m?t c?ng th?c m?i m?n; thi?u s?c ph?c v? th? c?n th?m ho?c thay m?n." if trusted and occasion == "daily" and options.layout_mode != "custom" else _policy_note(options))
     return result

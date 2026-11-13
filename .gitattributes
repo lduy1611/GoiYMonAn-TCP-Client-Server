@@ -1,0 +1,2 @@
+# Keep the public SQL snapshot byte-identical for manifest checksum verification.
+/data/demo/catalog.sql text eol=lf

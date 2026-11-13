@@ -1,0 +1,112 @@
+{
+  "audit_date_local": "2026-11-04",
+  "timezone": "Asia/Saigon",
+  "status": "DATA_V2_PROPOSAL_AWAITING_OWNER_REVIEW",
+  "database_access": "One consistent read-only transaction; SELECT and schema inspection only; rollback and close; no TCP server or benchmark started.",
+  "dataset_version": "vi-v2-50-recipes-r1",
+  "counts": {
+    "recipes": 50,
+    "ingredients": 50,
+    "relations": 252,
+    "aliases": 12,
+    "required_relations": 151,
+    "optional_relations": 101
+  },
+  "comparison_with_original_sql": {
+    "recipes_including_r1_instructions": true,
+    "ingredients": true,
+    "relations": true,
+    "aliases": true,
+    "r1_updates_parsed": 10
+  },
+  "checks": {
+    "recipe_ids_exactly_1_to_50": true,
+    "ingredient_ids_exactly_1_to_50": true,
+    "unique_relation_pairs": true,
+    "relation_fk_valid": true,
+    "alias_fk_valid": true,
+    "all_quantities_nonempty": true,
+    "all_quantities_numeric_text_positive": true,
+    "all_required_flags_0_or_1": true,
+    "classification_ids_titles_match": true,
+    "all_recipes_have_three_numbered_steps": true
+  },
+  "legacy_role_counts": {
+    "main": 23,
+    "vegetable": 4,
+    "soup": 6,
+    "starch": 15,
+    "other": 2
+  },
+  "raw_unit_counts": {
+    "quả": 38,
+    "g": 82,
+    "củ": 33,
+    "miếng": 4,
+    "tép": 16,
+    "nhánh": 18,
+    "phần": 10,
+    "thanh": 2,
+    "muỗng": 39,
+    "cây": 3,
+    "cái": 3,
+    "ml": 3,
+    "lá": 1
+  },
+  "raw_g_or_ml_relation_count": 85,
+  "other_raw_units_relation_count": 167,
+  "existing_source_url_counts": {
+    "null": 10,
+    "generic_vietnam_tourism_page": 40
+  },
+  "recipe_specific_external_sources_verified_in_this_audit": 0,
+  "missing_metadata": {
+    "base_servings": 50,
+    "region": 50,
+    "diet": 50,
+    "occasion": 50,
+    "structured_verified_quantities": 252
+  },
+  "explicit_text_relation_gap_recipe_ids": [
+    1,
+    2,
+    5,
+    7,
+    8,
+    11,
+    12,
+    16,
+    17,
+    20,
+    22,
+    23,
+    24,
+    25,
+    26,
+    28,
+    37,
+    39,
+    44,
+    46
+  ],
+  "reviewed_recipe_rows": 50,
+  "unused_ingredient_ids": [
+    29,
+    32,
+    33
+  ],
+  "semantics": "Review observations are evidence of internal textual gaps or review needs, not approved corrections, source validation, dietary certification, or regional labels.",
+  "source_file_sha256": {
+    "source/database/database.sql": "4820ee8770e85159b0d507cf7c75752efff4fe13434611c4be35a0bb0de3c599",
+    "source/database/schema.sql": "d337bfaec19b840cc0d6e18d4d97b5a0afddfa493bce8e2f0d9b20480b7b8b6a",
+    "source/database/mysql_seed.sql": "0f47805b1558c21c485fa4fc09463c2afa76c3e9b7b56acfda0075561e4f0014",
+    "source/database/mysql_expanded_seed.sql": "c7bc48e229d5d153d617ebfbe74fcb35c16e39954c96846e85d77b7e7c45006c",
+    "source/database/mysql_recipe_instructions_update.sql": "279aa570ac6d7cfdaaf0ad329e94d2bf888c006a9063b4b3ff148506206e04fa",
+    "data/recipe_categories.json": "4d0965cb42e8eef1f91598cd537d988b86a187ce3b6698564cb388da3b62ba71",
+    "source/server/ranking.py": "27efdb7f5d6ed41ad92e97c99c16b0d47c5a92709532d5dbda69a94ad87d68d6",
+    "source/server/meal_plan.py": "86b058a61818fec5f69d5d81b58870c40a6f31cb3d965aa8f74026a18156acc1",
+    "statics/results/tcp_server.jsonl": "719b880ff81d926436587e78d5185616a9e4cb29f8d17abc1249928a2f359040"
+  },
+  "report_tag": "4a2afc1041515cdfada9145dbda4b5de47dd140a"
+}
+

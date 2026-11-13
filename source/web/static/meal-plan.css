@@ -80,9 +80,37 @@
 .meal-page .meal-custom-layout{flex-basis:100%;margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fffdf8}
 .meal-page .meal-custom-layout h4{display:flex;justify-content:space-between;gap:10px;margin:0 0 10px;color:var(--green)}
 .meal-page .meal-custom-layout .meal-person-groups{grid-template-columns:1fr}
+.meal-page .meal-portion-summary{margin:12px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fffdf8;overflow-wrap:anywhere}
+.meal-page .meal-portion-summary details{margin-top:8px;color:var(--muted);font-size:13px}
+.meal-page .meal-portion-summary summary{cursor:pointer;color:var(--green);font-weight:700}
+.meal-page .meal-portion-summary ul{margin:6px 0;padding-left:20px}
+.meal-page .meal-portion-summary li{margin-block:4px}
+.meal-page .meal-portion-summary small{display:block;margin-top:8px}
 .meal-page .meal-custom-layout output{min-width:2ch}
 .meal-page .meal-person-stepper{display:grid;grid-template-columns:minmax(82px,1fr) 44px 34px 44px;align-items:center;gap:4px}
 .meal-page .meal-person-stepper>span{font-size:12px;font-weight:700}
 .meal-page .meal-person-stepper button{min-width:40px;min-height:40px;margin:0}
 .meal-page .meal-person-stepper output{text-align:center;font-weight:700}
 @media(max-width:760px){.meal-page .meal-person-groups{width:100%}}
+.meal-page #meal-manual{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.meal-page #meal-manual-candidates{max-height:260px;overflow:auto;margin-block:10px;overscroll-behavior:contain}
+.meal-page #meal-manual-candidates p{padding:10px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.meal-page #meal-manual-candidates small{display:block;color:var(--muted)}
+.meal-page #meal-context{margin-block:16px;padding:20px;overflow-wrap:anywhere}
+.meal-page #meal-context ul{padding-left:20px}
+.meal-page #meal-context li{margin-block:6px}
+.meal-page #meal-context details{margin-block:10px}
+.meal-page #meal-beverages small{display:block;color:var(--muted)}
+/* Daily beverage suggestions: advisory cards, separate from food shopping. */
+#meal-beverages .meal-beverage-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#meal-beverages .meal-beverage-card{display:flex;gap:14px;padding:14px;border:1px solid var(--line,#e3e8df);border-radius:14px;background:var(--surface,#fff);align-items:flex-start;min-width:0}
+#meal-beverages .meal-beverage-card .recipe-media{width:88px;min-width:88px;height:88px;margin:0;overflow:hidden;border-radius:10px}
+#meal-beverages .meal-beverage-card img{width:100%;height:100%;object-fit:cover}
+#meal-beverages .meal-beverage-copy{flex:1;min-width:0}
+#meal-beverages .meal-beverage-card a{font-size:1rem;font-weight:700;text-decoration:none;line-height:1.4}
+#meal-beverages .meal-beverage-card a:hover{text-decoration:underline}
+#meal-beverages .meal-beverage-card a:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:2px}
+#meal-beverages .meal-beverage-card p{font-size:.875rem;margin:6px 0 9px;line-height:1.5}
+#meal-beverages .meal-beverage-card small{font-size:.75rem;line-height:1.5}
+#meal-beverages .meal-beverage-empty{margin:0;color:var(--muted);font-size:.9rem}
+@media(max-width:640px){#meal-beverages .meal-beverage-grid{grid-template-columns:1fr}}

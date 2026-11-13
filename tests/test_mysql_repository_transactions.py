@@ -263,7 +263,7 @@ def test_draft_crosswalk_uses_schema_default_without_extra_status_grant_test_onl
             validate_writer_grants(actual_grants, draft_only=True, database=connection.database)
             assert repo.admin_draft_writer_ready() is True
             saved = client.post("/api/admin/revisions", json=payload, headers={"X-CSRF-Token": csrf})
-            assert saved.status_code == 200, saved.json()
+            assert saved.status_code == 200, saved.text
             revision_id = saved.json()["data"]["revision_id"]
             reopened = client.get(f"/api/admin/revisions/{revision_id}")
             assert reopened.status_code == 200

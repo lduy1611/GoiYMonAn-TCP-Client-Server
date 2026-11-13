@@ -4,11 +4,12 @@
 
 ## 1. Chạy demo
 
-- [README chính](../README.md): clone mặc định nhánh `main` để chạy demo UI v1.2.3, Python/requirements, bốn SQL cho **database mới**, hai loại tài khoản MySQL, `.env`, TCP Server, FastAPI, CLI và kiểm thử.
-- [Thứ tự SQL và cách đếm dataset](../README.md#3-nạp-dữ-liệu-mysql-cho-lần-cài-mới): mục tiêu 50 nguyên liệu, 50 món, 252 quan hệ, `vi-v2-50-recipes-r1`. Không chạy lại trên database có dữ liệu cần giữ.
+- [README chính](../README.md): bản demo mới gồm 216 món ăn và 10 đồ uống.
+- [Clone mới và import SQL](DEMO_FRESH_CLONE.md): dùng `data/demo/catalog.sql`, `.env.demo.example` và launcher portable; chỉ import trên database mới rỗng.
+- [Hướng dẫn legacy](LEGACY_SETUP.md): seed 50 món và launcher local cũ, giữ để tham khảo môi trường đã tồn tại.
 - [Kiểm tra thủ công v1.2](V1_2_SEARCH.md#kiểm-tra-thủ-công): tìm có/không dấu, bộ lọc, phân trang và Back/reload.
 
-Ứng dụng có đủ ảnh WebP cục bộ; không cần ảnh PNG gốc hoặc các file trong `statics/runtime/`. Log mới mặc định ở `statics/runtime/tcp_server.jsonl`, bị Git bỏ qua. Web gateway/CLI cần host/port khớp TCP Server, không cần quyền truy cập MySQL trực tiếp.
+Gói mới có 174 ảnh upload cùng 49 fallback local. Launcher portable sao chép ảnh còn thiếu từ `data/demo/` vào kho runtime riêng. Không cần datadir/ảnh gốc từ máy tác giả. Logs và dữ liệu phát sinh trong runtime bị Git bỏ qua. Web gateway/CLI cần host/port khớp TCP Server, không cần quyền truy cập MySQL trực tiếp.
 
 ## 2. Kỹ thuật hiện tại
 
@@ -27,4 +28,4 @@ Phiên bản **UI v1.2.3** là phiên bản giao diện/cache asset; giao thức
 - [Khảo sát ảnh B1](IMAGE_CANDIDATES.md), [bảng CSV B1](image_candidates.csv): ứng viên ban đầu, không phải mapping 50 ảnh hiện hành.
 - [Bằng chứng đã theo dõi](../statics/results/): giữ cả các lần E2 trước và lần lỗi. `phase4_dataset_audit.json` còn được tests ảnh và script E2 tham chiếu, không di chuyển cả thư mục khi dọn repository.
 
-Commit báo cáo `4a2afc1`, tag `v1.0-report` giữ nguyên bản đã nộp ban đầu; bản demo hiện tại nằm trên `main`. Xem [cách clone riêng tag báo cáo](../README.md#7-bằng-chứng-báo-cáo-và-giới-hạn) khi cần đối chiếu lịch sử. File `.log` lịch sử được nêu bằng tên vì không được Git phân phối; các tài liệu liên kết CSV/JSON có thật khi phù hợp, không tạo log giả hoặc thay đổi số liệu. Log TCP cũ vẫn được theo dõi trong Git ở giai đoạn này, chưa xóa/bỏ theo dõi. Không chạy script benchmark/audit/vẽ biểu đồ lên đường dẫn bằng chứng nếu chỉ muốn demo.
+Commit báo cáo `4a2afc1`, tag `v1.0-report` giữ nguyên bản đã nộp ban đầu. Xem [hướng dẫn legacy](LEGACY_SETUP.md) khi cần đối chiếu lịch sử. Các tài liệu liên kết CSV/JSON có thật khi phù hợp, không tạo log giả hoặc thay đổi số liệu. Log TCP và profile browser tạm đã bỏ theo dõi; file local vẫn giữ nguyên. Không chạy benchmark/audit/vẽ biểu đồ lên đường dẫn bằng chứng nếu chỉ muốn demo.

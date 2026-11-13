@@ -401,12 +401,22 @@ def _fingerprint(snapshot, source_db):
 
 
 def _empty_target(connection):
-    for table in ("users","ingredients","recipes","recipe_ingredients","recipe_steps","recipe_tags",
+    for table in ("users","ingredients","recipes","recipe_ingredients","recipe_steps",
                   "recipe_tag_links","recipe_images","recipe_edit_history","recipe_id_map","ingredient_id_map",
-                  "unified_import_runs"):
+                  "unified_import_runs","achievement_posts","achievement_images",
+                  "achievement_comments","feedback_submissions"):
         n = int(_query(connection, f"SELECT COUNT(*) n FROM {table}")[0]["n"])
         if n:
             return False
+    # Taxonomy v3 creates these seven core types before import. They are
+    # reference vocabulary, like units; arbitrary/deleted/renamed tags still
+    # make the target nonempty. Never delete target rows to permit an import.
+    from source.server.admin_taxonomies import CORE_DISH_TYPES
+    tags=_query(connection,"SELECT tag_type,code,label,normalized_label,is_core,deleted_at FROM recipe_tags")
+    actual_tags=sorted((r['tag_type'],r['code'],r['label'],r['normalized_label'],bool(r['is_core']),r['deleted_at']) for r in tags)
+    expected_tags=sorted(('dish_type',code,label,_norm(label),True,None) for code,label in CORE_DISH_TYPES.items())
+    if actual_tags not in ([],expected_tags):
+        return False
     # create_schema seeds this exact immutable reference vocabulary for Admin's
     # structured amount editor. It is not imported business data; permit either
     # an empty unit table (older TEST_ONLY schemas) or the exact standard seed.
@@ -559,6 +569,11 @@ def migrate(source, target, *, test_only=False, admin_username=None, admin_passw
         for rid,tag_type,code,label in snapshot["tags"]:
             if rid in snapshot["recipes"]:
                 _execute(target,"INSERT INTO recipe_tag_links(recipe_id,tag_id) VALUES(%s,%s)",(rid,tag_ids[(tag_type,code)]))
+        # Core dish-type tags mirror the operational recipe role at import time;
+        # additional Admin-selected dish types remain many-to-many metadata.
+        _execute(target,"""INSERT IGNORE INTO recipe_tag_links(recipe_id,tag_id)
+            SELECT r.recipe_id,t.tag_id FROM recipes r JOIN recipe_tags t
+              ON t.tag_type='dish_type' AND t.code=r.role AND t.is_core=TRUE""")
         for source_kind,source_id,recipe_id in snapshot["recipe_maps"]:
             _execute(target,"INSERT INTO recipe_id_map(source_kind,source_id,recipe_id) VALUES(%s,%s,%s)",
                      (source_kind,source_id,recipe_id))
@@ -596,8 +611,8 @@ class UnifiedRepository:
     def _visible_recipes(self, connection):
         return _query(connection,"SELECT recipe_id,title,minutes_total AS minutes,role FROM recipes WHERE is_public=1 AND deleted_at IS NULL ORDER BY recipe_id")
 
-    def recipes_for_ranking(self, connection):
-        recipes=self._visible_recipes(connection)
+    def recipes_for_ranking(self, connection, *, include_drinks=False):
+        recipes=[r for r in self._visible_recipes(connection) if include_drinks or r["role"]!="drink"]
         if not recipes:return []
         ids=[int(r["recipe_id"]) for r in recipes]
         marks=",".join(["%s"]*len(ids))
@@ -607,7 +622,40 @@ class UnifiedRepository:
             rid=int(row["recipe_id"]);iid=int(row["ingredient_id"])
             grouped[rid]["all_ids"].add(iid)
             if row["requirement"]=="required":grouped[rid]["required_ids"].add(iid)
-        return [{"id":int(r["recipe_id"]),"title":r["title"],"minutes":int(r["minutes"]),**grouped[int(r["recipe_id"])]} for r in recipes]
+        portion_rows=_query(connection,f"""SELECT r.recipe_id,r.servings,r.role,r.portion_data_status,COUNT(ri.line_no) AS line_count,
+            SUM(CASE WHEN ri.amount_kind='exact' AND ri.amount_min>0 AND ri.amount_max=ri.amount_min
+                AND u.code IS NOT NULL AND ri.measurement_basis IN ('gross','edible','prepared')
+                AND ri.purpose IN ('main','seasoning','cooking_medium','garnish','unknown','consumed')
+                AND ri.requirement IN ('required','optional','unknown') AND ri.scaling_mode IN ('linear','fixed')
+                THEN 1 ELSE 0 END) AS complete_lines,
+            SUM(CASE WHEN ri.requirement='required' AND (
+                    (r.role='soup' AND ri.purpose='main' AND u.code IN ('ml','l'))
+                    OR (r.role IN ('main','vegetable','side') AND ri.purpose='main'))
+                THEN 1 ELSE 0 END) AS driver_lines,
+            SUM(CASE WHEN ri.requirement='required' AND ri.amount_kind='exact' AND ri.amount_min>0
+                AND ri.amount_max=ri.amount_min AND ri.measurement_basis='gross'
+                AND ri.scaling_mode='linear' AND (
+                    (r.role='soup' AND ri.purpose='main' AND u.code IN ('ml','l') AND u.dimension='volume')
+                    OR (r.role IN ('main','vegetable','side') AND ri.purpose='main'
+                        AND u.code IN ('g','kg') AND u.dimension='mass'))
+                THEN 1 ELSE 0 END) AS valid_driver_lines
+            FROM recipes r JOIN recipe_ingredients ri USING(recipe_id)
+            LEFT JOIN units u USING(unit_id)
+            WHERE r.recipe_id IN ({marks}) GROUP BY r.recipe_id,r.servings,r.role""",tuple(ids))
+        portions={int(row["recipe_id"]):bool(row["servings"] is not None and row["servings"]>0
+            and row["line_count"]>0 and row["line_count"]==row["complete_lines"]
+            and row["driver_lines"]>0 and row["driver_lines"]==row["valid_driver_lines"]
+            and row["portion_data_status"] in ("verified","estimated"))
+            for row in portion_rows}
+        portions_by_id={int(row["recipe_id"]):row for row in portion_rows}
+        return [{"id":int(r["recipe_id"]),"title":r["title"],"minutes":int(r["minutes"]),
+                 "portion_ready":portions.get(int(r["recipe_id"]),False),
+                 "service_capacity":(str(portions_by_id[int(r["recipe_id"])]["servings"])
+                    if int(r["recipe_id"]) in portions_by_id and portions_by_id[int(r["recipe_id"])]["portion_data_status"] in ("verified","estimated")
+                    and portions_by_id[int(r["recipe_id"])]["servings"] is not None else None),
+                 "service_capacity_status":(portions_by_id[int(r["recipe_id"])]["portion_data_status"]
+                    if int(r["recipe_id"]) in portions_by_id else "needs_review"),
+                 **grouped[int(r["recipe_id"])]} for r in recipes]
 
     def recipes_for_search(self, connection):
         rows=self.recipes_for_ranking(connection)
@@ -636,4 +684,3 @@ class UnifiedRepository:
         base=default_classification()
         roles={int(r["recipe_id"]):r["role"] for r in self._visible_recipes(connection)}
         return Classification("unified:"+base.version,{**base.categories,**roles})
-

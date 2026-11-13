@@ -2,7 +2,7 @@ const state = {
   available: new Map(), excluded: new Map(), ingredients: new Map(),
   visible: [], busy: false, searchVersion: 0, datasetVersion: null, view: null,
   mode: 'recommend', offset: 0, advancedOpen: false, requestVersion: 0, controller: null, recommendTimer: null,
-  selectionNotice: ''
+  selectionNotice: '', restoredEntryView: undefined
 };
 const $ = id => document.getElementById(id);
 const validRecipeID = value => Number.isSafeInteger(value) && (value >= 1 && value <= 4294967295 || value > 4294967296 && value <= 8589934591);
@@ -37,6 +37,7 @@ function saveSelection() {
   try {
     sessionStorage.setItem(storageKey, JSON.stringify({
       version: 3,
+      entryView: new URLSearchParams(location.search).get('view'),
       conditions: {
         available: [...state.available.keys()], excluded: [...state.excluded.keys()],
         maxMinutes: $('max-minutes').value, topK: $('top-k').value,
@@ -102,6 +103,7 @@ function restoreSelection() {
     const saved = JSON.parse(sessionStorage.getItem(storageKey));
     if (!saved) return;
     if (typeof saved !== 'object' || Array.isArray(saved) || ![undefined, 2, 3].includes(saved.version)) throw Error('Invalid snapshot');
+    state.restoredEntryView = saved.entryView;
     // Accept the old selection-only format without treating it as cached results.
     const conditions = saved.version >= 2 ? saved.conditions : saved;
     const validNumber = (value, max, min = 1) => typeof value === 'string' && /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max;
@@ -186,9 +188,12 @@ async function loadIngredients(query = '', restore = false) {
     if (restore) {
       restoreSelection();
       const entryView = new URLSearchParams(location.search).get('view');
-      if (entryView === 'explore') { state.mode = 'search'; $('recipe-query').value = ''; state.offset = 0; }
-      else if (entryView === 'fridge') { state.mode = 'recommend'; state.offset = 0; }
-      else if (entryView === 'lunch') { state.mode = 'search'; $('recipe-query').value = ''; $('max-minutes').value = '30'; state.offset = 0; }
+      // Entry presets apply when changing navigation context, never to a
+      // reload/Back of that same context's valid search and pagination.
+      const entering = entryView !== null && entryView !== state.restoredEntryView;
+      if (entering && entryView === 'explore') { state.mode = 'search'; $('recipe-query').value = ''; state.offset = 0; }
+      else if (entering && entryView === 'fridge') { state.mode = 'recommend'; state.offset = 0; }
+      else if (entering && entryView === 'lunch') { state.mode = 'search'; $('recipe-query').value = ''; $('max-minutes').value = '30'; state.offset = 0; }
       document.querySelectorAll('[data-user-tab]').forEach(link => {
         const active = link.dataset.userTab === entryView;
         if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');

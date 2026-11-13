@@ -234,5 +234,3 @@ try {
   if(socket?.readyState===WebSocket.OPEN){try{await send('Browser.close',{},null);}catch{}socket.close();}
   if(child.exitCode===null)child.kill();for(const p of pending.values())clearTimeout(p.timer);
 }
-
-

@@ -13,3 +13,19 @@
   <a id="user-account-tab" class="user-account-tab" href="{{ account_target or '/account/login' }}" {% if active_tab == 'account' %}aria-current="page"{% endif %}>Tài khoản</a>
 </header>
 <script src="/static/account-menu.js?v=user-shell-2" defer></script>
+<button class="feedback-fab" id="feedback-open" type="button" aria-haspopup="dialog" aria-controls="feedback-dialog">Góp ý</button>
+<p id="feedback-toast" class="feedback-toast" role="status" aria-live="polite"></p>
+<dialog id="feedback-dialog" class="feedback-dialog" aria-labelledby="feedback-title">
+  <form id="feedback-form" class="feedback-form">
+    <header><div><p class="eyebrow">GIÚP CHÚNG TÔI TỐT HƠN</p><h2 id="feedback-title">Gửi góp ý</h2></div><button id="feedback-close" class="feedback-close" type="button" aria-label="Đóng">×</button></header>
+    <label for="feedback-category">Loại góp ý</label>
+    <select id="feedback-category" required><option value="bug">Báo lỗi</option><option value="feature">Đề xuất tính năng</option><option value="other">Góp ý khác</option></select>
+    <label for="feedback-content">Nội dung góp ý</label>
+    <textarea id="feedback-content" rows="5" maxlength="3000" required placeholder="Mô tả góp ý của bạn…"></textarea>
+    <label for="feedback-image">Ảnh đính kèm <span>(không bắt buộc, tối đa 1 ảnh/5 MB)</span></label>
+    <input id="feedback-image" type="file" accept="image/jpeg,image/png,image/webp">
+    <p id="feedback-status" class="feedback-status" role="status" aria-live="polite"></p>
+    <button id="feedback-submit" class="feedback-submit" type="submit">Gửi góp ý</button>
+  </form>
+</dialog>
+<script src="/static/feedback.js?v=feedback-widget-20261111" defer></script>

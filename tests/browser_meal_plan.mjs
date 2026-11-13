@@ -120,7 +120,7 @@ try {
   await click('[data-meal-slot="main"] .detail-link');await wait('location.pathname==="/recipes/1"&&document.querySelector(".detail-heading h1")!==null');
   const mealSnapshot=await evaluate('JSON.parse(sessionStorage.getItem("goiy-meal-plan-v1"))');
   assert.equal(await evaluate('document.querySelector(".back").getAttribute("href")'),'/meal-plan/v1');
-  assert.equal(await evaluate('document.querySelector(".header-link").getAttribute("href")'),'/meal-plan/v1');
+  assert.equal(await evaluate('document.querySelector("[data-user-tab=meal]").getAttribute("href")'),'/meal-plan');
   // UI return is an allowlisted link, distinct from native browser Back/Forward.
   await click('.back');await wait('location.pathname==="/meal-plan/v1"');await ready();
   assert.deepEqual(await recipeIDs(),[1,5,29]);assert.equal(posts.length,beforeBack);
@@ -131,7 +131,7 @@ try {
   await click('[data-meal-slot="main"] .detail-link');await wait('location.pathname==="/recipes/1"&&document.getElementById("detail").getAttribute("aria-busy")==="false"');
   await historyStep(-1,'/meal-plan/v1');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
   await historyStep(1,'/recipes/1');await wait('document.querySelector(".back")!==null');
-  await click('.header-link');await wait('location.pathname==="/meal-plan/v1"');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
+  await click('.back');await wait('location.pathname==="/meal-plan/v1"');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
   await navigate('/meal-plan/v1');await ready();assert.deepEqual(await recipeIDs(),[1,5,29]);
   assert.equal(await evaluate('sessionStorage.getItem("goiy-selection-v1")'),homeSnapshot);
   // Tight filters leave no alternate soup: retain both the dishes and grocery list.

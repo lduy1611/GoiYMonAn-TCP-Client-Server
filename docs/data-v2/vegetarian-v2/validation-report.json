@@ -1,0 +1,135 @@
+{
+  "prepared_on": "2026-11-05",
+  "collected_recipe_count": 18,
+  "roles": {
+    "main": 6,
+    "vegetable": 5,
+    "soup": 7
+  },
+  "priority_review_keys": [
+    "V02",
+    "V07",
+    "V12",
+    "V13",
+    "V16",
+    "V17"
+  ],
+  "priority_review_count": 6,
+  "next_review_count": 12,
+  "missing_single_base_servings": [
+    "V01",
+    "V03",
+    "V05",
+    "V08",
+    "V09",
+    "V10",
+    "V11",
+    "V15"
+  ],
+  "missing_total_minutes": [
+    "V01",
+    "V06",
+    "V14",
+    "V15"
+  ],
+  "component_line_count": 200,
+  "approved_count": 0,
+  "mysql_import_applied": true,
+  "import_blocker": null,
+  "first_batch_plan_counts": {
+    "v2_sources": 7,
+    "v2_evidence_sets": 62,
+    "v2_evidence": 75,
+    "v2_evidence_set_members": 74,
+    "v2_units": 10,
+    "v2_ingredients": 33,
+    "v2_ingredient_forms": 0,
+    "v2_recipes": 6,
+    "v2_recipe_revisions": 6,
+    "v2_recipe_ingredient_lines": 50
+  },
+  "first_batch_mapping": [
+    {
+      "recipe_key": "V02",
+      "recipe_id": 3685705018,
+      "revision_id": 379258889
+    },
+    {
+      "recipe_key": "V07",
+      "recipe_id": 3297541855,
+      "revision_id": 992919278
+    },
+    {
+      "recipe_key": "V12",
+      "recipe_id": 3665631389,
+      "revision_id": 3812492879
+    },
+    {
+      "recipe_key": "V13",
+      "recipe_id": 1643267492,
+      "revision_id": 406989983
+    },
+    {
+      "recipe_key": "V16",
+      "recipe_id": 1836954336,
+      "revision_id": 2819792141
+    },
+    {
+      "recipe_key": "V17",
+      "recipe_id": 1808618143,
+      "revision_id": 1906929526
+    }
+  ],
+  "first_batch_hash": "84aed2fc7fce9e60d3a6ddcf1e1319f7b2ad7b759383c7dede7ce2e1e345fc02",
+  "activation_requirements": [
+    "User review of sources, full components including optional products, roles, diet assertions and exact source variants.",
+    "Review product compositions/identities and measurement units; portions and linear scaling need their own approval.",
+    "The existing migration stores revisions/evidence, but reviewed diet/role associations and published new-recipe reading must be integrated before use.",
+    "Meal planning currently reads legacy recipes; add a release-gated v2 adapter and compatible recipe/detail/ingredient identities. Do not copy source variants into legacy.",
+    "Only an explicitly approved publication/release may enable real Chay data; a draft import cannot activate it."
+  ],
+  "first_batch_status": "NEEDS_VERIFICATION",
+  "first_batch_import_receipt": "statics/runtime/vegetarian-source-imports/20261105-103243-5d4d2be2/import-receipt.json",
+  "first_batch_verification": "statics/runtime/vegetarian-source-imports/20261105-103243-5d4d2be2/verification.json",
+  "backup_path": "D:\\Project\\lap trinh mang\\statics\\runtime\\backups\\vegetarian-source-20261105-103243-5d4d2be2\\goiy_mon_an-before-priority-six.sql",
+  "backup_sha256": "b0a2e908b7085bdaec51c9a3d830f9decff4565422c536191ccfb44a64f0261f",
+  "next_batches_prepared": [
+    {
+      "file": "docs/data-v2/vegetarian-v2/prepared-batch-02.json",
+      "recipe_keys": [
+        "V01",
+        "V03",
+        "V04",
+        "V05",
+        "V06",
+        "V08"
+      ],
+      "applied": false,
+      "roles_proposed": {
+        "main": 2,
+        "vegetable": 2,
+        "soup": 2
+      },
+      "ingredient_lines": 71
+    },
+    {
+      "file": "docs/data-v2/vegetarian-v2/prepared-batch-03.json",
+      "recipe_keys": [
+        "V09",
+        "V10",
+        "V11",
+        "V14",
+        "V15",
+        "V18"
+      ],
+      "applied": false,
+      "roles_proposed": {
+        "main": 2,
+        "vegetable": 1,
+        "soup": 3
+      },
+      "ingredient_lines": 79
+    }
+  ],
+  "next_twelve_imported": false
+}
