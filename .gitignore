@@ -52,3 +52,19 @@ htmlcov/
 *.bak
 *.orig
 Thumbs.db
+
+# Main's previous 201-recipe package is superseded by data/demo/.
+# Preserve existing local copies, including in the integration worktree.
+/statics/demo/
+/source/database/unified_v3_demo_seed.sql
+
+# Compatible exclusions retained from main
+*.log.*
+*.jsonl
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.p12
+*.pfx
+playwright-report/
+test-results/
