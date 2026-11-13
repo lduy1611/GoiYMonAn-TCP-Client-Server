@@ -4,15 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page_title }} · Hôm nay ăn gì?</title>
-  <link rel="stylesheet" href="/static/styles.css?v=ui-1.2.4">
+  <link rel="stylesheet" href="/static/styles.css?v=feedback-widget-20261111">
   <link rel="stylesheet" href="/static/meal-plan.css?v=meal-web-1">
 </head>
 <body class="meal-page" data-classification-version="{{ classification_version }}">
   <a class="skip-link" href="#meal-form">Đến phần tạo mâm cơm</a>
-  <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span><span>Hôm nay ăn gì?<small>Từ nguyên liệu trong căn bếp của bạn</small></span></a>
-    <a class="back-home route-link" href="/">← Tìm &amp; gợi ý món</a>
-  </header>
+  {% include "_user_header.html" %}
   <main class="container meal-container">
     <section class="hero meal-hero">
       <p class="eyebrow">Một bữa cơm, bớt một lần phân vân</p>
@@ -57,6 +54,6 @@
   </main>
   <footer>Gợi ý mang tính tham khảo · Thành phần và định lượng theo dữ liệu công thức hiện có.</footer>
   <script src="/static/recipe-images.js?v=images-admin-20261107" defer></script>
-  <script src="/static/meal-plan.js?v=meal-web-3" defer></script>
+  <script src="/static/meal-plan.js?v=meal-web-4" defer></script>
 </body>
 </html>

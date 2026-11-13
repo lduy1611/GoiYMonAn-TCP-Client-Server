@@ -2,7 +2,7 @@ const state = {
   available: new Map(), excluded: new Map(), ingredients: new Map(),
   visible: [], busy: false, searchVersion: 0, datasetVersion: null, view: null,
   mode: 'recommend', offset: 0, advancedOpen: false, requestVersion: 0, controller: null, recommendTimer: null,
-  selectionNotice: ''
+  selectionNotice: '', restoredEntryView: undefined
 };
 const $ = id => document.getElementById(id);
 const validRecipeID = value => Number.isSafeInteger(value) && (value >= 1 && value <= 4294967295 || value > 4294967296 && value <= 8589934591);
@@ -37,6 +37,7 @@ function saveSelection() {
   try {
     sessionStorage.setItem(storageKey, JSON.stringify({
       version: 3,
+      entryView: new URLSearchParams(location.search).get('view'),
       conditions: {
         available: [...state.available.keys()], excluded: [...state.excluded.keys()],
         maxMinutes: $('max-minutes').value, topK: $('top-k').value,
@@ -102,6 +103,7 @@ function restoreSelection() {
     const saved = JSON.parse(sessionStorage.getItem(storageKey));
     if (!saved) return;
     if (typeof saved !== 'object' || Array.isArray(saved) || ![undefined, 2, 3].includes(saved.version)) throw Error('Invalid snapshot');
+    state.restoredEntryView = saved.entryView;
     // Accept the old selection-only format without treating it as cached results.
     const conditions = saved.version >= 2 ? saved.conditions : saved;
     const validNumber = (value, max, min = 1) => typeof value === 'string' && /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max;
@@ -175,7 +177,7 @@ async function loadIngredients(query = '', restore = false) {
   const box = $('ingredient-results');
   box.setAttribute('aria-busy', 'true');
   try {
-    const response = await fetch('/api/ingredients?query=' + encodeURIComponent(query) + '&limit=50');
+    const response = await fetch('/api/ingredients?query=' + encodeURIComponent(query) + '&limit=250');
     const envelope = await response.json();
     if (version !== state.searchVersion) return;
     if (!response.ok || !envelope.ok) throw Error(envelope.error?.message || 'Không tải được nguyên liệu.');
@@ -183,7 +185,20 @@ async function loadIngredients(query = '', restore = false) {
     if (restore) state.datasetVersion = envelope.data.dataset_version;
     items.forEach(item => state.ingredients.set(item.id, item.name));
     state.visible = items;
-    if (restore) restoreSelection();
+    if (restore) {
+      restoreSelection();
+      const entryView = new URLSearchParams(location.search).get('view');
+      // Entry presets apply when changing navigation context, never to a
+      // reload/Back of that same context's valid search and pagination.
+      const entering = entryView !== null && entryView !== state.restoredEntryView;
+      if (entering && entryView === 'explore') { state.mode = 'search'; $('recipe-query').value = ''; state.offset = 0; }
+      else if (entering && entryView === 'fridge') { state.mode = 'recommend'; state.offset = 0; }
+      else if (entering && entryView === 'lunch') { state.mode = 'search'; $('recipe-query').value = ''; $('max-minutes').value = '30'; state.offset = 0; }
+      document.querySelectorAll('[data-user-tab]').forEach(link => {
+        const active = link.dataset.userTab === entryView;
+        if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+      });
+    }
     render();
     if (restore && state.mode === 'recommend' && state.available.size && !state.view) scheduleRecommendation();
     if (restore && state.selectionNotice) $('selection-feedback').textContent=state.selectionNotice;
@@ -298,13 +313,15 @@ function syncMode() {
   $('recommend-limit-field').classList.toggle('hidden', searching);
   for (const id of ['recipe-query', 'max-missing', 'search-limit']) $(id).disabled = !searching;
   $('top-k').disabled = searching;
-  for (const mode of ['search', 'recommend']) {
-    $('mode-' + mode).setAttribute('aria-pressed', String(state.mode === mode));
-    $('mode-' + mode).disabled = false;
-  }
   $('recommend-button').classList.toggle('hidden', !searching);
   $('auto-update-help').classList.toggle('hidden', searching);
   $('recommend-button').querySelector('span').textContent = searching ? 'Tìm kiếm món ăn' : 'Tìm món phù hợp';
+  const entryView = new URLSearchParams(location.search).get('view');
+  const activeTab = entryView === 'lunch' ? 'lunch' : searching ? 'explore' : 'fridge';
+  document.querySelectorAll('[data-user-tab]').forEach(link => {
+    if (link.dataset.userTab === activeTab) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
 }
 
 function render() {
@@ -457,13 +474,6 @@ $('clear-selection').onclick = () => {
 };
 for (const id of ['max-minutes', 'top-k', 'recipe-query', 'max-missing', 'search-limit']) {
   $(id).addEventListener('input', selectionChanged);
-}
-for (const mode of ['search', 'recommend']) {
-  $('mode-' + mode).onclick = () => {
-    if (state.mode === mode) return;
-    state.mode = mode;
-    selectionChanged();
-  };
 }
 $('page-prev').onclick = event => recommend(event, Math.max(0, state.offset - Number($('search-limit').value)));
 $('page-next').onclick = event => recommend(event, state.offset + Number($('search-limit').value));

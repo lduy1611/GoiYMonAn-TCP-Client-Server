@@ -14,7 +14,7 @@ TEST_REVIEW = Review("APPROVED", "TEST_ONLY_SIMULATED_DECISION_DO_NOT_IMPORT",
 def test_line(line_id=1, **changes):
     values = dict(line_id=line_id, ingredient_id=1001, name="TEST_ONLY ingredient",
                   ingredient_form="test_raw", amount_kind="exact", amount_min="100",
-                  unit="g", measurement_basis="edible", purpose="consumed",
+                  unit="g", measurement_basis="edible", purpose="main",
                   review=TEST_REVIEW, scaling_mode="linear", scaling_review=TEST_REVIEW)
     return IngredientLine(**{**values, **changes})
 

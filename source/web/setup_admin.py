@@ -56,6 +56,7 @@ INGREDIENT_ADMIN_GRANTS = [
     "GRANT INSERT (identity_status) ON goiy_mon_an.v2_ingredients TO 'goiy_admin_writer'@'localhost'",
     "GRANT INSERT (legacy_ingredient_id) ON goiy_mon_an.v2_ingredients TO 'goiy_admin_writer'@'localhost'",
     "GRANT UPDATE (canonical_name, normalized_name) ON goiy_mon_an.v2_ingredients TO 'goiy_admin_writer'@'localhost'",
+    "GRANT UPDATE (identity_status) ON goiy_mon_an.v2_ingredients TO 'goiy_admin_writer'@'localhost'",
     "GRANT SELECT ON goiy_mon_an.v2_ingredient_admin_state TO 'goiy_admin_writer'@'localhost'",
     "GRANT INSERT (ingredient_id, is_active) ON goiy_mon_an.v2_ingredient_admin_state TO 'goiy_admin_writer'@'localhost'",
     "GRANT UPDATE (is_active) ON goiy_mon_an.v2_ingredient_admin_state TO 'goiy_admin_writer'@'localhost'",
@@ -73,7 +74,7 @@ ALLOWED_GRANTS = {
         "insert (id, canonical_name, normalized_name)",
         "insert (legacy_ingredient_id)",
         "insert (identity_status)",
-        "update (canonical_name, normalized_name)"},
+        "update (canonical_name, normalized_name)", "update (identity_status)"},
     "goiy_mon_an.v2_ingredient_admin_state": {"select", "insert (ingredient_id, is_active)", "update (is_active)"},
     "goiy_mon_an.ingredients": {"select", "select (id, name, normalized_name)"},
     "goiy_mon_an.v2_admin_legacy_ingredient_overrides": {
@@ -190,6 +191,7 @@ INGREDIENT_REQUIRED_GRANTS = {
         "insert (legacy_ingredient_id)",
         "insert (identity_status)",
         "update (canonical_name, normalized_name)",
+        "update (identity_status)",
     },
     "goiy_mon_an.v2_ingredient_admin_state": {
         "select", "insert (ingredient_id, is_active)", "update (is_active)",

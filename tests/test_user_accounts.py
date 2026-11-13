@@ -218,6 +218,7 @@ def test_user_and_admin_account_flow_through_gateway_and_tcp(mysql_db,monkeypatc
             assert client.get("/meal-plan").status_code==200
             assert client.get("/account/login").status_code==200
             assert client.get("/account/register").status_code==200
+            assert client.get("/account/profile",follow_redirects=False).status_code==303
             assert "Georgia,serif" in client.get("/static/account.css").text
             assert "@media(max-width:520px)" in client.get("/static/account.css").text
             admin_css=client.get("/static/admin.css").text
@@ -235,6 +236,9 @@ def test_user_and_admin_account_flow_through_gateway_and_tcp(mysql_db,monkeypatc
             assert client.cookies.get("goiy_user_session")
             session=client.get("/api/auth/session").json()["data"]
             assert session["authenticated"] is True and session["username"]=="TEST_ONLY_flow"
+            profile=client.get("/account/profile")
+            assert profile.status_code==200 and 'id="profile-username"' in profile.text
+            assert 'aria-current="page"' in profile.text
             assert client.post("/api/auth/logout",headers={"X-CSRF-Token":"wrong"}).status_code==403
             assert client.post("/api/auth/logout",headers={"X-CSRF-Token":session["csrf_token"]}).status_code==200
             assert not client.cookies.get("goiy_user_session")
@@ -246,6 +250,17 @@ def test_user_and_admin_account_flow_through_gateway_and_tcp(mysql_db,monkeypatc
             from tests.test_admin import hash_for
             monkeypatch.setenv("ADMIN_PASSWORD_HASH",hash_for("TEST_ONLY admin pass"))
             assert client.post("/api/admin/login",json={"username":"TEST_ONLY_ADMIN","password":"TEST_ONLY admin pass"}).status_code==200
+            admin_session=client.get("/api/admin/session").json()["data"]
+            assert admin_session["username"]=="TEST_ONLY_ADMIN" and admin_session["csrf_token"]
+            assert client.post("/api/auth/logout",headers={"X-CSRF-Token":user_session["csrf_token"]}).status_code==200
+            assert client.get("/api/auth/session").json()["data"]["authenticated"] is False
+            admin_after_user_logout=client.get("/api/admin/session").json()["data"]
+            assert admin_after_user_logout["username"]=="TEST_ONLY_ADMIN"
+            user_login=client.post("/api/auth/login",json={"username":"TEST_ONLY_flow","password":"TEST_ONLY good password 24"})
+            assert user_login.status_code==200
+            user_session=client.get("/api/auth/session").json()["data"]
+            assert client.get("/api/admin/session").json()["data"]["username"]=="TEST_ONLY_ADMIN"
+            assert client.get("/admin").status_code==200
             admin_page=client.get("/admin").text
             for marker in ('data-admin-view="overview"','data-admin-view="recipes"',
                            'data-admin-view="ingredients"','data-admin-view="users"',

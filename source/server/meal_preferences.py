@@ -18,7 +18,8 @@ CODES = {
     "diet": {"non_vegetarian": "Mặn", "vegetarian": "Chay"},
     "region": {"north": "Miền Bắc", "central": "Miền Trung", "south": "Miền Nam"},
     "occasion": {"daily": "Hằng ngày", "weekend": "Cuối tuần", "guests": "Đãi khách",
-                 "birthday": "Sinh nhật", "tet": "Tết", "ancestral": "Cúng gia tiên"},
+                 "birthday": "Sinh nhật", "tet": "Tết", "ancestral": "Cúng gia tiên",
+                 "snack": "Ăn vặt", "drinking": "Mồi nhậu"},
 }
 
 
@@ -42,7 +43,7 @@ class Catalog:
     @property
     def vegetarian_ids(self):
         return frozenset(rid for rid, result in self.vegetarian_assessments.items()
-                         if result["status"] == "VERIFIED" and self.roles.get(rid) in ("main", "vegetable", "soup"))
+                         if result["status"] == "VERIFIED" and self.roles.get(rid) in ("main", "vegetable", "soup", "side"))
 
     @property
     def meat_ids(self):
@@ -52,14 +53,40 @@ class Catalog:
         return [key for key, value in preferences.items()
                 if (key == "diet" and (value not in ("non_vegetarian", "vegetarian")
                                         or value == "non_vegetarian" and not self.evidence)
-                    or key in ("region", "occasion") and not self._context_supported(key, value)
+                    # A region/occasion label makes the filter meaningful even
+                    # when its intersection lacks a required role. Let the
+                    # planner return the exact shortage instead of collapsing
+                    # that case into METADATA_UNAVAILABLE.
+                    or key in ("region", "occasion") and not self.eligible_ids(key, value)
                     or key not in ("diet", "region", "occasion"))]
 
     def _context_supported(self, group, code):
         ids = self.contexts.get(group, {}).get(code, frozenset())
+        roles = {rid: self.roles.get(rid) for rid in ids}
+        if group == "occasion" and code in ("guests", "drinking"):
+            return bool(self._supported_people(roles, code))
+        if group == "occasion" and code == "snack":
+            from source.server.meal_plan_v2 import counts_for_people
+            candidates = {rid for rid in ids if self.roles.get(rid) in ("side", "starch", "other")}
+            return any(len(candidates) >= sum(counts_for_people(people).values())
+                       for people in range(1, 13))
         counts = {g: sum(self.roles.get(rid) == g for rid in ids) for g in ("main", "vegetable", "soup")}
         minimum = {"main": 1, "vegetable": 1, "soup": 1}
         return all(counts[g] >= minimum[g] for g in counts)
+
+    @staticmethod
+    def _supported_people(roles, occasion):
+        supported = []
+        for people in range(1, 13):
+            if occasion == "guests":
+                mains = 2 if people <= 5 else 3
+                required = {"side": 1, "main": mains, "vegetable": 1, "soup": int(people >= 4)}
+            else:
+                mains = 2 if people <= 3 else 3 if people <= 5 else 4
+                required = {"main": mains, "side": 2 if people >= 9 else 1}
+            if all(sum(role == wanted for role in roles.values()) >= count for wanted, count in required.items()):
+                supported.append(people)
+        return supported
 
     def eligible_ids(self, group, code):
         return self.contexts.get(group, {}).get(code, frozenset())
@@ -72,7 +99,11 @@ class Catalog:
                 if group == "diet" and code == "vegetarian":
                     from source.server.meal_plan_v2 import counts_for_people
                     counts = {g: sum(self.roles.get(rid) == g for rid in self.vegetarian_ids) for g in ("main", "vegetable", "soup")}
-                    supported = [n for n in range(1,13) if all(counts[g] >= required for g, required in counts_for_people(n).items())]
+                    vegetarian_roles = {rid: self.roles.get(rid) for rid in self.vegetarian_ids}
+                    supported = sorted({n for n in range(1,13)
+                        if all(counts[g] >= required for g, required in counts_for_people(n, "daily").items())}
+                        | set(self._supported_people(vegetarian_roles, "guests"))
+                        | set(self._supported_people(vegetarian_roles, "drinking")))
                     choices[group].append({"code": code, "label": label, "enabled": bool(supported) if layout_support else 4 in supported,
                         "recipe_count": len(self.vegetarian_ids), "role_counts": counts,
                         **({"supported_people": supported} if layout_support else {}),
@@ -84,11 +115,36 @@ class Catalog:
                     ids = self.eligible_ids(group, code)
                     counts = {g: sum(self.roles.get(rid) == g for rid in ids)
                               for g in ("main", "vegetable", "soup")}
-                    supported = all(counts[g] >= 1 for g in counts)
+                    supported_people = None
+                    snack_count = 0
+                    if group == "occasion" and code == "snack":
+                        from source.server.meal_plan_v2 import counts_for_people
+                        snack_count = sum(self.roles.get(rid) in ("side", "starch", "other") for rid in ids)
+                        supported_people = [people for people in range(1, 13)
+                                            if snack_count >= sum(counts_for_people(people).values())]
+                        supported = bool(supported_people)
+                    elif group == "occasion" and code in ("guests", "drinking"):
+                        supported_people = self._supported_people({rid: self.roles.get(rid) for rid in ids}, code)
+                        supported = bool(supported_people)
+                    else:
+                        supported = bool(ids)
+                    incomplete_reason = (
+                        "Có món đã gắn nhãn này; bộ ghép sẽ nêu chính xác vai trò còn thiếu khi kết hợp vùng miền, chế độ ăn và kiểu mâm."
+                    )
                     choices[group].append({"code": code, "label": label, "enabled": supported,
                         "recipe_count": len(ids), "role_counts": counts,
-                        "reason": "Äá»§ metadata Ä‘Ã£ duyá»‡t cho cáº¥u trÃºc 4 ngÆ°á»i (1 chÃ­nh, 1 rau, 1 canh)." if supported else
-                            "ChÆ°a Ä‘á»§ metadata Ä‘Ã£ duyá»‡t Ä‘á»ƒ ghÃ©p mÃ¢m 4 ngÆ°á»i: cáº§n Ã­t nháº¥t 1 mÃ³n chÃ­nh, 1 mÃ³n rau vÃ  1 mÃ³n canh. NEEDS_VERIFICATION khÃ´ng Ä‘Æ°á»£c tÃ­nh."})
+                        **({"supported_people": supported_people} if supported_people is not None else {}),
+                        "reason": ((f"Có {snack_count} công thức Ăn vặt đủ vai trò; hỗ trợ số người: {', '.join(map(str, supported_people))}."
+                                    if supported else
+                                    f"Chưa đủ món Ăn vặt có vai trò phù hợp: cần 3 món khác nhau cho 4 người, hiện có {snack_count}.")
+                                   if group == "occasion" and code == "snack" else
+                                   (f"Đủ vai trò đã phân loại; hỗ trợ {', '.join(map(str, supported_people))} người."
+                                    if supported else
+                                    f"Chưa đủ vai trò cho kiểu mâm này. Khai vị/món ăn kèm và các nhóm món phải có nhãn phù hợp.")
+                                   if group == "occasion" and code in ("guests", "drinking") else
+                                   ("Đủ metadata cho cấu trúc vai trò cơ bản." if supported and all(counts[g] >= 1 for g in counts)
+                                    else incomplete_reason if supported else
+                                    "Chưa có món nào mang nhãn này trong catalog công khai."))})
                     continue
                 usable = group == "diet" and code == "non_vegetarian" and bool(self.evidence)
                 counts = {g: sum(self.roles.get(rid) == g for rid in self.evidence)
@@ -115,7 +171,7 @@ def load(recipes, ingredient_names, classification, details=()):
                 if unicodedata.normalize("NFC", ingredient_names.get(entry["ingredient_id"], "")) == entry["expected_name"]}
     roles = {r["id"]: classification.categories[r["id"]] for r in recipes if r["id"] in classification.categories}
     evidence = {r["id"]: tuple(sorted(set(r["required_ids"]) & explicit)) for r in recipes
-                if roles.get(r["id"]) in ("main", "vegetable", "soup") and set(r["required_ids"]) & explicit}
+                if roles.get(r["id"]) in ("main", "vegetable", "soup", "side") and set(r["required_ids"]) & explicit}
     reviews = vegetarian.read_reviews()
     assessments = {r["id"]: vegetarian.assess(r, reviews.get(r["id"])) for r in details}
     # Require the detail snapshot to agree with the candidate identities in this request.

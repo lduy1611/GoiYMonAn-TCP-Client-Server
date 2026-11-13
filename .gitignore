@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.demo.example
 *.pem
 *.key
 
@@ -10,12 +11,24 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+/.pytest_*/
+/._pytest_*/
+/.testtmp_*/
+/.test_runtime/
+# Local backups can contain accounts, hashes, sessions and private records.
+/backups/
+# Evidence and image generation originals remain local. Publish reviewed runtime
+# copies under data/demo/ instead of exposing this entire working directory.
+/output/
+/.tmp_admin_write_test_*/
+/.tmp_admin_writer_test_*/
 
 # File database va log runtime
 *.db
 *.sqlite3
 *.log
 statics/runtime/
+statics/results/tcp_server.jsonl
 
 # Tai lieu dong goi
 BAO_CAO_TAI_LIEU/
@@ -24,3 +37,18 @@ BAO_CAO_TAI_LIEU.zip
 # File tam
 .vscode/
 .DS_Store
+.env.admin.local
+
+# Additional local environments and tooling caches
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.pyo
+*.tmp
+*.bak
+*.orig
+Thumbs.db

@@ -27,10 +27,11 @@ def test_server_loads_log_and_startup_settings_before_use(tmp_path, case):
         )
     before = dotenv.read_bytes() if dotenv.exists() else None
     env = os.environ.copy()
-    for name in ("TCP_LOG_PATH", "TCP_HOST", "TCP_PORT", "PYTHON_DOTENV_DISABLED"):
+    for name in ("TCP_LOG_PATH", "TCP_HOST", "TCP_PORT", "TCP_MAX_CONNECTIONS", "PYTHON_DOTENV_DISABLED"):
         env.pop(name, None)
     env["PYTHONPATH"] = str(ROOT)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env.update(TCP_DB_SCHEMA='legacy', TCP_DB_POOL_SIZE='4')
     if case == "process_override":
         env.update(TCP_LOG_PATH="override/deep/from-process.jsonl", TCP_HOST="127.0.0.1", TCP_PORT="9202")
     if case == "dotenv_disabled":
@@ -48,7 +49,9 @@ rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines
 assert rows[0]["marker"] == "startup-config-test" and rows[1]["marker"] == "append-test"
 assert "timestamp_utc" in rows[0]
 class StartupProbe:
-    def __init__(self, host, port): self.host, self.port = host, port
+    def __init__(self, host, port, *, max_connections):
+        assert max_connections == 4
+        self.host, self.port = host, port
     def serve_forever(self):
         print(json.dumps({"path": path.as_posix(), "host": self.host, "port": self.port}))
 module["main"].__globals__["TCPServer"] = StartupProbe

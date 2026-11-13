@@ -130,3 +130,39 @@ $testRoot = Join-Path (Get-Location) ('statics/runtime/mysql-v2-tests/run-' + [g
 
 Temp root mới nằm trong workspace; fixture chỉ DROP database do nó vừa tạo trên
 instance riêng, rồi dừng process riêng. Không dừng service MySQL80 đang sử dụng.
+# Unified v3 TEST_ONLY additions
+
+`unified_v3_002_achievements.sql` adds user achievement posts, local image metadata,
+and comments. It is applied to the named local rehearsal database with
+`python -m source.database.apply_achievement_schema_test`; that helper is pinned
+to `127.0.0.1:63900/goiy_v3_quality_final_20261110_test` and refuses any other
+database identity. Do not use this helper for production.
+
+
+## Feedback for unified v3
+
+`unified_v3_003_feedback.sql` adds `feedback_submissions` for guest and signed-in
+feedback. It stores category, text, processing status, optional `user_id`, and optional
+local-image metadata. Image bytes remain under `statics/runtime/feedback-images/`; they
+are not stored in MySQL or the repository. Fresh unified-v3 databases also receive the
+table from `source/database/unified_schema.sql`.
+
+This is an additive DDL migration and is not applied automatically by the application.
+Before applying it to an existing database, create and verify a database backup, confirm
+the target database identity, then execute this one file with an authorized MySQL
+administrator. Do not apply it to production without a separate deployment decision.
+The isolated integration tests apply the unified schema only to a private temporary
+MySQL instance.
+
+## Admin recipe taxonomies for unified v3
+
+`unified_v3_004_admin_taxonomies.sql` extends `recipe_tags` with dish-type,
+weather, cooking-method and main-ingredient groups plus description, core and
+soft-delete metadata. It inserts the protected built-in dish types and links each
+existing recipe to its current `recipes.role`. Recipe records and role values are
+not modified. The current meal algorithm continues reading `recipes.role`.
+
+This migration is not automatic and has no destructive down migration. Apply it
+only to a verified TEST_ONLY clone first, then verify tag counts and recipe links.
+Do not run it against `127.0.0.1:63900` or any demo/production schema from this
+feature branch. The CRUD integration tests use a separate private mysqld instance.

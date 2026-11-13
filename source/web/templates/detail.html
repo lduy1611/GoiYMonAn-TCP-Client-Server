@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page_title }}</title>
-  <link rel="stylesheet" href="/static/styles.css?v=ui-1.2.4">
+  <link rel="stylesheet" href="/static/styles.css?v=feedback-widget-20261111">
 </head>
 <body>
   <a class="skip-link" href="#detail">Đến nội dung công thức</a>
-  <header class="topbar"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span><span>Hôm nay ăn gì?<small>Từ nguyên liệu trong căn bếp của bạn</small></span></a><a href="{{ return_to }}" class="header-link">{{ 'Về mâm cơm' if return_to == '/meal-plan' else 'Chọn món khác' }} <span aria-hidden="true">↗</span></a></header>
+  {% include "_user_header.html" %}
   <main class="container detail-container">
     <a href="{{ return_to }}" class="back">← {{ 'Về mâm cơm hôm nay' if return_to == '/meal-plan' else 'Về trang gợi ý' }}</a>
     <article id="detail" class="detail-card" data-recipe-id="{{ recipe_id }}" data-return-to="{{ return_to }}" aria-busy="true" tabindex="-1"><div class="loading panel" role="status"><span class="spinner" aria-hidden="true"></span>Đang tải công thức…</div></article>

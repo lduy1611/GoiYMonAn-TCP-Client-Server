@@ -89,16 +89,26 @@ def test_mysql_tcp_operations(mysql_server):
     assert all(updated[k] == old[k] for k in ("main:1", "vegetable:1"))
 
 
-def test_mysql_multiclient_and_http_outage(mysql_server):
+def test_mysql_multiclient_and_http_outage(mysql_server,monkeypatch):
     server, thread, port = mysql_server
     with ThreadPoolExecutor(max_workers=10) as executor:
         responses = list(executor.map(lambda _: TCPClient(port=port).request("PING", {}), range(10)))
     assert len(responses) == 10
     assert all(response["ok"] for response in responses)
-    os.environ["TCP_HOST"] = "127.0.0.1"
-    os.environ["TCP_PORT"] = str(port)
+    monkeypatch.setenv("TCP_HOST", "127.0.0.1")
+    monkeypatch.setenv("TCP_PORT", str(port))
     server.shutdown()
     thread.join(timeout=2)
+    assert not thread.is_alive() and server.sock.fileno() == -1
+    # Windows can time out rather than immediately refuse a closed loopback
+    # port. This case tests the refused-connection mapping specifically;
+    # actual socket timeouts are tested separately in test_web_meal_plan.
+    original_connect = socket.create_connection
+    def refused(address, *args, **kwargs):
+        if address == ('127.0.0.1', port):
+            raise ConnectionRefusedError(10061, 'TEST_ONLY closed listener')
+        return original_connect(address, *args, **kwargs)
+    monkeypatch.setattr(socket, 'create_connection', refused)
     with TestClient(app) as client:
         response = client.get("/api/health")
     assert response.status_code == 503

@@ -214,13 +214,21 @@ def build_shopping_lists(details: Iterable[dict[str, Any]], selected: frozenset[
             if ingredient_id in selected:
                 continue
             entry = grouped.setdefault(ingredient_id, {"ingredient_id": ingredient_id,
-                                                       "name": ingredient["name"], "uses": []})
-            entry["uses"].append({"recipe_id": recipe["id"], "quantity": ingredient["quantity"],
-                                  "is_required": bool(ingredient["is_required"])})
+                                                       "name": ingredient["name"], "uses_by_recipe": {}})
+            use = entry["uses_by_recipe"].setdefault(recipe["id"], {"recipe_id": recipe["id"],
+                "quantities": [], "is_required": False})
+            quantity = ingredient.get("quantity")
+            if isinstance(quantity, str) and quantity.strip() and quantity not in use["quantities"]:
+                use["quantities"].append(quantity)
+            use["is_required"] = use["is_required"] or bool(ingredient["is_required"])
     required, optional = [], []
     for ingredient_id in sorted(grouped):
         entry = grouped[ingredient_id]
-        entry["uses"].sort(key=lambda use: use["recipe_id"])
+        entry["uses"] = [{"recipe_id": use["recipe_id"],
+            # Text amounts are not parsed or added; keep multiple lines readable.
+            "quantity": " + ".join(use["quantities"]) or None,
+            "is_required": use["is_required"]}
+            for use in sorted(entry.pop("uses_by_recipe").values(), key=lambda use: use["recipe_id"])]
         (required if any(use["is_required"] for use in entry["uses"]) else optional).append(entry)
     return {"shopping_list": required, "optional_shopping_list": optional,
             "optional_missing_ids": [entry["ingredient_id"] for entry in optional]}

@@ -52,6 +52,34 @@ def test_admin_recipe_update_requires_a_sha256_edit_version():
     assert error.value.code=="INVALID_PAYLOAD"
 
 
+def test_unified_recipe_tags_do_not_require_optional_source_url():
+    payload=v2_payload({"ingredient_id":1,"quantity_raw":"250 g"})
+    payload.update(servings=None,minutes_prep=None,minutes_cook=None,steps=None,tags=[])
+    optional_metadata_payload=v2_payload({"ingredient_id":1,"quantity_raw":"250 g"})
+    assert validate_save(optional_metadata_payload,REQUEST_ID,unified=True)["role"]=="main"
+    payload["tags"]=[{"tag_type":"diet","code":"vegetarian"}]
+    result=validate_save(payload,REQUEST_ID,unified=True)
+    assert result["tags"]==payload["tags"]
+    payload.pop("source_url",None)
+    payload["tags"]=[{"tag_type":"diet","code":"non_vegetarian"}]
+    with pytest.raises(ProtocolError,match="unsupported recipe tag"):
+        validate_save(payload,REQUEST_ID,unified=True)
+
+
+def test_admin_recipe_rejects_question_mark_in_quantity_but_allows_free_text():
+    payload = v2_payload({"ingredient_id": 1, "quantity_raw": "250 g?"})
+    with pytest.raises(ProtocolError) as error:
+        validate_save(payload, REQUEST_ID)
+    assert error.value.code == "INVALID_PAYLOAD"
+
+    payload["ingredients"][0]["quantity_raw"] = "250 g"
+    payload["description"] = "Is this the right amount?"
+    payload["instructions"] = "Check the texture? Continue cooking until tender."
+    result = validate_save(payload, REQUEST_ID)
+    assert result["description"].endswith("?")
+    assert result["instructions"].endswith("tender.")
+
+
 def test_legacy_admin_edit_also_forces_required_ingredients():
     payload = {
         "recipe_id": 1,
@@ -60,6 +88,7 @@ def test_legacy_admin_edit_also_forces_required_ingredients():
         "instructions": "TEST_ONLY steps",
         "minutes": 12,
         "is_visible": True,
+        "expected_version": "a" * 64,
         "ingredients": [{"ingredient_id": 2, "quantity": "", "is_required": False}],
     }
     result = validate_update(payload, REQUEST_ID)

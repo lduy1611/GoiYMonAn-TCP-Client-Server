@@ -312,11 +312,15 @@ def test_legacy_outputs_identical_with_publication_active_or_inactive(released):
     # Public picker/cache versions intentionally change with release state,
     # while the legacy recipe payload and algorithm output stay identical.
     assert active[0]["data"]["dataset_version"] != inactive[0]["data"]["dataset_version"]
+    assert ':v2:' in active[1]['data']['classification_version']
+    assert active[1]['data']['classification_version'] != inactive[1]['data']['classification_version']
     for left,right in zip(active,inactive):
         if isinstance(left.get("data"),dict):
             left["data"].pop("dataset_version",None)
+            left['data'].pop('classification_version',None)
         if isinstance(right.get("data"),dict):
             right["data"].pop("dataset_version",None)
+            right['data'].pop('classification_version',None)
     assert active==inactive
 
 
@@ -472,10 +476,24 @@ def test_published_v2_browser_after_50_legacy_ingredients(released,monkeypatch,t
                 assert ':admin:' in generated.classification_version
                 detail=web.get(f'/api/recipes/{v2_public_id(recipe_id)}')
                 assert detail.status_code==200 and detail.json()['data']['title']=='TEST_ONLY direct Admin dish'
-            profile=tmp_path/'chrome';profile.mkdir()
-            result=subprocess.run([node,str(Path(__file__).with_name('browser_meal_plan_admin_version.mjs')),str(browser),
-                f'http://127.0.0.1:{http_port}',str(profile),str(width)],
-                capture_output=True,text=True,encoding='utf-8',timeout=120)
-            if result.returncode==77:pytest.skip(result.stdout+result.stderr)
-            assert result.returncode==0,result.stdout+result.stderr
+            # Modern Edge does not reliably load unpacked extensions in
+            # headless dump-dom. Use real page interactions through Playwright.
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                browser_instance=pw.chromium.launch(executable_path=str(browser),headless=True)
+                page=browser_instance.new_page(viewport={'width':width,'height':900})
+                errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+                page.goto(f'http://127.0.0.1:{http_port}/meal-plan')
+                page.wait_for_function("!document.querySelector('#meal-generate').disabled")
+                with page.expect_response(lambda r:r.url.endswith('/api/meal-plan/v2')) as reply:
+                    page.locator('[data-meal-type="custom"]').click()
+                assert reply.value.status==200
+                data=reply.value.json()['data']
+                page.wait_for_function("document.querySelectorAll('[data-meal-slot]').length===3")
+                assert len(data['plan']['items'])==3
+                assert ':v2:' in data['classification_version'] and ':admin:' in data['classification_version']
+                assert page.evaluate("JSON.parse(sessionStorage.getItem('goiy-meal-plan-v2')).view.data.classification_version")==data['classification_version']
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+                assert not errors,errors
+                browser_instance.close()
         finally:server.should_exit=True;thread.join(timeout=5)

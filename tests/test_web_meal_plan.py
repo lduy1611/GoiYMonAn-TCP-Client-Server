@@ -25,9 +25,13 @@ def test_meal_page_and_home_link_preserve_existing_routes(meal_web):
     web, _ = meal_web
     page = web.get("/meal-plan")
     assert page.status_code == 200 and 'data-classification-version="meal-categories-v1"' in page.text
-    assert 'id="meal-form"' in page.text and '/static/meal-plan-v2.js?v=meal-classification-admin-1' in page.text
-    assert 'id="meal-count-main"' not in page.text and 'id="meal-structure"' in page.text
-    assert 'id="meal-people"' in page.text and 'id="meal-portions-retry"' in page.text
+    assert 'id="meal-form"' in page.text and '/static/meal-plan-v2.js?v=beverage-cards-20261113-2' in page.text
+    assert 'id="meal-count-main"' in page.text and 'id="meal-custom-layout"' in page.text
+    assert 'id="meal-structure"' not in page.text
+    assert 'meal-pref-occasion' not in page.text and 'Ngân sách' not in page.text and 'Dịp ăn' not in page.text
+    assert 'class="panel meal-people"' in page.text
+    assert 'id="meal-portions"' not in page.text and 'Khẩu phần theo số người' not in page.text
+    assert 'id="meal-shopping"' in page.text and 'id="meal-copy-list"' in page.text
     assert 'href="/meal-plan"' in web.get("/").text
     assert web.get("/recipes/1").status_code == 200
     assert web.post("/api/recommend", json={"ingredient_ids":[1,2]}).json()["data"]["algorithm"] == "proposed"
@@ -76,6 +80,42 @@ def test_http_partial_regeneration_comes_from_tcp(meal_web):
     assert changed["changed_slots"] == ["main","soup"]
 
 
+@pytest.mark.parametrize("occasion", ["snack", "drinking"])
+def test_meal_v2_gateway_accepts_existing_snack_and_drinking_preferences(meal_web, occasion):
+    web, _ = meal_web
+    response = web.post("/api/meal-plan/v2", json={"people": 4, "preferences": {"occasion": occasion}})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["algorithm"] == "meal-plan-v2"
+    assert body["request_id"] == response.headers["x-request-id"]
+
+
+def test_meal_v2_contract_accepts_layout_transition_with_removed_and_added_slots():
+    from source.web.meal_plan_v2_contract import Data
+
+    slots = ["main:1", "main:2", "main:3", "main:4", "vegetable:1", "soup:1"]
+    data = {
+        "dataset_version": "test-dataset", "classification_version": "test-classification",
+        "algorithm": "meal-plan-v2", "layout_mode": "automatic",
+        "counts": {"main": 4, "vegetable": 1, "soup": 1},
+        "plan": {
+            "items": [{"slot": slot, "recipe_id": 100 + index, "title": f"Dish {index}",
+                       "minutes": 10, "matched_ids": [], "missing_ids": [], "missing_count": 0}
+                      for index, slot in enumerate(slots)],
+            "required_ids": [], "matched_ids": [], "missing_ids": [], "missing_count": 0,
+            "total_minutes": 60, "time_basis": "sum_of_recipe_minutes",
+            "shopping_list": [], "optional_shopping_list": [], "optional_missing_ids": [],
+        },
+        "changed_slots": ["main:1", "main:2", "main:3", "main:4", "vegetable:1", "vegetable:2", "soup:1", "soup:2"],
+        "warnings": [], "reason": None, "preferences": {"occasion": "guests"},
+        "metadata_version": "test-metadata", "people": 12,
+    }
+
+    parsed = Data.model_validate(data)
+    assert len(parsed.changed_slots) == 8
+
+
 @pytest.mark.parametrize("payload", [
     {"servings":2}, {"ingredient_ids":[True]}, {"ingredient_ids":[999]}, {"excluded_ids":[0]},
     {"ingredient_ids":[1],"excluded_ids":[1]}, {"max_missing":False}, {"max_minutes":"30"},
@@ -105,7 +145,8 @@ def test_stopped_real_tcp_server_returns_503(meal_web):
     web, server = meal_web
     server.shutdown()
     response = web.post("/api/meal-plan",json={})
-    assert response.status_code == 503 and not response.json()["ok"]
+    assert response.status_code in {503, 504} and not response.json()["ok"]
+    assert response.json()["error"]["code"] in {"UPSTREAM_UNAVAILABLE", "CONNECT_TIMEOUT", "TIMEOUT", "UPSTREAM_DISCONNECTED"}
 
 
 def test_old_server_unknown_operation_is_reported(meal_web,monkeypatch):

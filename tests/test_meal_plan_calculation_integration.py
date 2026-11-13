@@ -104,11 +104,14 @@ def test_db_error_is_not_disguised_as_missing_approval(meal_web, monkeypatch):
     assert response.status_code == 503 and response.json()["error"]["code"] == "DB_ERROR"
 
 
-def test_stopped_tcp_server_returns_existing_503(meal_web):
+def test_stopped_tcp_server_returns_transport_specific_gateway_error(meal_web):
     web, server = meal_web
     server.shutdown()
     response = web.post('/api/meal-plan/calculate', json={"recipe_ids": [1], "people": 4})
-    assert response.status_code == 503
+    # Depending on whether the local TCP connect fails immediately or reaches
+    # its deadline, the gateway distinguishes unavailable (503) from timeout (504).
+    assert response.status_code in {503, 504}
+    assert response.json()["error"]["code"] in {"UPSTREAM_UNAVAILABLE", "CONNECT_TIMEOUT", "TIMEOUT"}
 
 
 @pytest.mark.parametrize("corruption", ["recipe_ids", "people", "completeness", "reason", "provenance", "quantity"])

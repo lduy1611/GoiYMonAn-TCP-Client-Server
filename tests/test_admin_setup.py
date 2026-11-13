@@ -69,6 +69,9 @@ def test_old_draft_only_writer_does_not_pass_review_write_preflight():
 def test_ingredient_admin_requires_only_v2_column_and_state_table_grants():
     grants=writer_grants()+setup_admin.INGREDIENT_ADMIN_GRANTS
     setup_admin.validate_writer_grants(grants,ingredient_admin=True)
+    activation_grant=next(g for g in grants if "UPDATE (identity_status)" in g)
+    with pytest.raises(RuntimeError,match="ingredient-admin"):
+        setup_admin.validate_writer_grants([g for g in grants if g != activation_grant],ingredient_admin=True)
     with pytest.raises(RuntimeError,match="ingredient-admin"):
         setup_admin.validate_writer_grants(writer_grants(),ingredient_admin=True)
     with pytest.raises(RuntimeError,match="unapproved"):

@@ -5,20 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f0e5">
   <title>{{ page_title }}</title>
+  <link rel="stylesheet" href="/static/styles.css?v=feedback-widget-20261111">
   <link rel="stylesheet" href="/static/account.css?v=accounts-20261106">
 </head>
 <body class="account-page" data-mode="{{ mode }}">
+  {% set active_tab = 'account' %}
+  {% include "_user_header.html" %}
   <main class="account-shell">
-    <a class="account-brand" href="/" aria-label="Về trang chủ">
-      <span class="account-brand-mark" aria-hidden="true">✳</span>
-      <span>Hôm nay ăn gì?<small>Gợi ý vừa với căn bếp của bạn</small></span>
-    </a>
     <section class="account-card" aria-labelledby="account-title">
       <a class="account-back" href="/">← Trở về chọn món</a>
       <p class="account-kicker">TÀI KHOẢN NGƯỜI DÙNG</p>
       <h1 id="account-title">{{ 'Chào mừng bạn trở lại' if mode == 'login' else 'Tạo tài khoản mới' }}</h1>
       <p class="account-intro">{{ 'Đăng nhập để dùng các tiện ích cá nhân khi chúng sẵn sàng.' if mode == 'login' else 'Tạo tài khoản để chuẩn bị cho các tiện ích cá nhân sắp tới.' }}</p>
-      <form id="account-form" data-mode="{{ mode }}" novalidate>
+      <form id="account-form" data-mode="{{ mode }}" data-next="{{ next_url or '/' }}" novalidate>
         <label for="account-username">Tên đăng nhập</label>
         <input id="account-username" name="username" autocomplete="username" minlength="3" maxlength="32" required placeholder="Ví dụ: bepnhaminh">
         <p class="account-hint">3–32 ký tự: chữ Latin, số, dấu chấm, gạch ngang hoặc gạch dưới.</p>
@@ -32,7 +31,7 @@
       </form>
       <p id="account-message" class="account-message" role="status" aria-live="polite"></p>
       <p class="account-switch">{{ 'Chưa có tài khoản?' if mode == 'login' else 'Đã có tài khoản?' }}
-        <a href="{{ '/account/register' if mode == 'login' else '/account/login' }}">{{ 'Đăng ký' if mode == 'login' else 'Đăng nhập' }}</a>
+        <a href="{{ ('/account/register?next=' ~ (next_url|urlencode)) if mode == 'login' and next_url else ('/account/register' if mode == 'login' else '/account/login') }}">{{ 'Đăng ký' if mode == 'login' else 'Đăng nhập' }}</a>
       </p>
       <p class="account-guest">Bạn vẫn có thể <a href="/">tìm món và tạo mâm cơm với tư cách khách</a>.</p>
     </section>

@@ -44,6 +44,10 @@ class AdminIngredientConflict(RuntimeError):
     pass
 
 
+class AdminTaxonomyConflict(RuntimeError):
+    pass
+
+
 class AdminIngredientSchemaUnavailable(RuntimeError):
     pass
 
@@ -464,6 +468,65 @@ class MySQLRepository:
                 try:cursor.execute("SELECT RELEASE_LOCK('goiy_admin_direct_recipe_ids')");cursor.fetchone()
                 finally:cursor.close()
             connection.close()
+
+    def admin_restore_v2_recipe_snapshot(self,payload,author_ref):
+        """Restore only an unreviewed direct-catalog DRAFT, preserving review history."""
+        from source.common.catalog_ids import V2_OFFSET,UINT32_MAX,v2_public_id
+        if type(payload["recipe_id"]) is not int or not V2_OFFSET < payload["recipe_id"] <= V2_OFFSET+UINT32_MAX:
+            raise ValueError("invalid v2 recipe identity")
+        storage_recipe_id=payload["recipe_id"]-V2_OFFSET
+        connection=self._admin_writer()
+        try:
+            cursor=connection.cursor(dictionary=True)
+            try:
+                cursor.execute("""SELECT r.id,r.recipe_id,r.revision_no,r.status,r.content_review_id,
+                        r.servings_review_id,r.title,r.description,r.instructions,r.minutes,
+                        c.direct_publication,c.is_deleted
+                    FROM v2_recipe_revisions r JOIN v2_admin_recipe_catalog_overrides c ON c.revision_id=r.id
+                    WHERE r.id=%s AND r.recipe_id=%s FOR UPDATE""",
+                    (payload["revision_id"],storage_recipe_id))
+                row=cursor.fetchone()
+                if row is None:raise AdminDraftConflict("snapshot revision is no longer the active catalog revision",reason="revision_identity_mismatch")
+                if (row["status"]!="DRAFT" or row["content_review_id"] is not None
+                    or row["servings_review_id"] is not None or not row["direct_publication"] or row["is_deleted"]):
+                    raise AdminDraftConflict("only an unreviewed active Admin DRAFT can be restored",reason="revision_not_restorable")
+                cursor.execute("""SELECT line_no,ingredient_id,quantity_raw,requirement,status,quantity_review_id,scaling_review_id
+                    FROM v2_recipe_ingredient_lines WHERE revision_id=%s ORDER BY line_no FOR UPDATE""",(payload["revision_id"],))
+                current_lines=cursor.fetchall()
+                if any(x["status"]!="DRAFT" or x["quantity_review_id"] is not None or x["scaling_review_id"] is not None
+                       for x in current_lines):
+                    raise AdminDraftConflict("reviewed ingredient data cannot be restored",reason="reviewed_ingredient_data")
+                from source.server.admin_recipes import revision_edit_version
+                current_version=revision_edit_version(revision_id=row["id"],recipe_id=row["recipe_id"],
+                    revision_no=row["revision_no"],status=row["status"],title=row["title"],
+                    description=row["description"] or "",instructions=row["instructions"],minutes=row["minutes"],
+                    ingredients=[{"line_no":x["line_no"],"ingredient_id":x["ingredient_id"],
+                        "quantity_raw":x["quantity_raw"],"requirement":x["requirement"],"status":x["status"],
+                        "quantity_review_id":x["quantity_review_id"],"scaling_review_id":x["scaling_review_id"]}
+                        for x in current_lines])
+                if current_version!=payload["expected_version"]:
+                    raise AdminDraftConflict("recipe changed after the restore snapshot was selected",reason="stale_version")
+                mapped=self._admin_validate_ingredients(connection,payload["ingredients"])
+                cursor.execute("UPDATE v2_recipe_revisions SET title=%s,description=%s,instructions=%s,minutes=%s WHERE id=%s AND status='DRAFT'",
+                    (payload["title"],payload["description"],payload["instructions"],payload["minutes"],payload["revision_id"]))
+                cursor.execute("DELETE FROM v2_recipe_ingredient_lines WHERE revision_id=%s AND status='DRAFT'",(payload["revision_id"],))
+                cursor.close();cursor=None
+                self._admin_insert_lines(connection,payload["revision_id"],mapped)
+                cursor=connection.cursor()
+                cursor.execute("UPDATE v2_admin_recipe_catalog_overrides SET role_code=%s,updated_by=%s WHERE v2_recipe_id=%s AND revision_id=%s",
+                    (payload["role"],author_ref[:255],storage_recipe_id,payload["revision_id"]))
+                # MySQL reports rowcount=0 for an unchanged role/author even
+                # when the locked catalog row matched. Verify identity instead.
+                if self._fetchone(connection,"SELECT 1 FROM v2_admin_recipe_catalog_overrides WHERE v2_recipe_id=%s AND revision_id=%s",
+                                  (storage_recipe_id,payload["revision_id"])) is None:
+                    raise AdminDraftConflict("catalog changed while restoring recipe",reason="revision_identity_mismatch")
+            finally:
+                if cursor is not None:cursor.close()
+            connection.commit()
+            return {"recipe_id":v2_public_id(int(row["recipe_id"])),"revision_id":int(payload["revision_id"]),"status":"RESTORED"}
+        except Exception:
+            connection.rollback();raise
+        finally:connection.close()
 
     def admin_set_recipe_lifecycle(self,payload,author_ref):
         from source.common.catalog_ids import V2_OFFSET
@@ -938,13 +1001,14 @@ class MySQLRepository:
             if catalog=="v2":
                 filtered=[]
                 for iid,legacy_id,name,normalized_name,identity_status,is_active,review_id,evidence_id,uses in v2_rows:
-                    # V2 imports remain available to recipe revision history,
-                    # but the ordinary Admin catalog includes only ingredients
-                    # explicitly created through Admin. Legacy crosswalk rows
-                    # are represented by their original legacy business ID.
-                    admin_managed=(legacy_id is None and identity_status=="DRAFT"
-                                   and review_id is None and evidence_id is None)
-                    if not admin_managed:continue
+                    # Keep the shared catalog projection unchanged. This Admin-
+                    # only view also exposes unreviewed identities that have no
+                    # attached evidence/decision, so an Admin can explicitly
+                    # rename and enable one through the normal guarded write.
+                    # Rows with review/evidence remain read-only history.
+                    manageable=(legacy_id is None and identity_status in {"DRAFT","NEEDS_VERIFICATION"}
+                                and review_id is None and evidence_id is None)
+                    if not manageable:continue
                     if active_only and not is_active:continue
                     if needle and needle not in ingredient_search_normalize(name):continue
                     from source.common.catalog_ids import v2_public_id
@@ -1067,7 +1131,7 @@ class MySQLRepository:
         except mysql.connector.Error as exc:
             connection.rollback()
             if exc.errno==1062:raise AdminIngredientConflict("ingredient name or ID already exists") from None
-            if exc.errno in (1142,1146,1227):raise AdminWriteUnavailable("ingredient writer grant or migration is missing") from None
+            if exc.errno in (1142,1143,1146,1227):raise AdminWriteUnavailable("ingredient writer grant or migration is missing") from None
             raise
         except Exception:
             if not committed:connection.rollback()
@@ -1100,16 +1164,43 @@ class MySQLRepository:
             if self._ingredient_duplicate(connection,payload["normalized_name"],storage_id):
                 raise AdminIngredientConflict("an ingredient with this Vietnamese-normalized name already exists")
             self._validate_legacy_ingredient_name(connection,payload["name"],payload["normalized_name"],None,storage_id)
-            cursor.execute("UPDATE v2_ingredients SET canonical_name=%s,normalized_name=%s WHERE id=%s AND identity_status IN ('DRAFT','NEEDS_VERIFICATION') AND review_decision_id IS NULL AND evidence_set_id IS NULL",
-                (payload["name"],payload["normalized_name"],storage_id))
-            if cursor.rowcount!=1:raise AdminIngredientConflict("ingredient is no longer editable")
+            if payload.get("make_available",False):
+                # An explicit Admin action makes this one unreviewed identity
+                # an ordinary DRAFT catalog item. It does not approve the row
+                # or alter any recipe revision that references its stable ID.
+                cursor.execute("UPDATE v2_ingredients SET canonical_name=%s,normalized_name=%s,identity_status='DRAFT' WHERE id=%s AND identity_status IN ('DRAFT','NEEDS_VERIFICATION') AND review_decision_id IS NULL AND evidence_set_id IS NULL",
+                    (payload["name"],payload["normalized_name"],storage_id))
+                # Validate the locked row's persisted values, not rowcount:
+                # MySQL reports zero when an idempotent UPDATE sets the same
+                # values. The following upsert can also report zero when its
+                # existing activation state is already 1.
+                updated=self._fetchone(connection,"SELECT canonical_name,normalized_name,identity_status,review_decision_id,evidence_set_id,legacy_ingredient_id FROM v2_ingredients WHERE id=%s FOR UPDATE",
+                    (storage_id,))
+                if (not updated or updated[0]!=payload["name"] or updated[1]!=payload["normalized_name"]
+                    or updated[2]!="DRAFT" or updated[3] is not None or updated[4] is not None or updated[5] is not None):
+                    raise AdminIngredientConflict("ingredient changed or is no longer editable")
+                cursor.execute("INSERT INTO v2_ingredient_admin_state(ingredient_id,is_active) VALUES(%s,1) ON DUPLICATE KEY UPDATE is_active=1",
+                    (storage_id,))
+                active=self._fetchone(connection,"SELECT is_active FROM v2_ingredient_admin_state WHERE ingredient_id=%s FOR UPDATE",
+                    (storage_id,))
+                if not active or int(active[0])!=1:
+                    raise AdminIngredientConflict("ingredient activation did not persist")
+            else:
+                cursor.execute("UPDATE v2_ingredients SET canonical_name=%s,normalized_name=%s WHERE id=%s AND identity_status IN ('DRAFT','NEEDS_VERIFICATION') AND review_decision_id IS NULL AND evidence_set_id IS NULL",
+                    (payload["name"],payload["normalized_name"],storage_id))
+                updated=self._fetchone(connection,"SELECT canonical_name,normalized_name,identity_status,review_decision_id,evidence_set_id,legacy_ingredient_id FROM v2_ingredients WHERE id=%s FOR UPDATE",
+                    (storage_id,))
+                if (not updated or updated[0]!=payload["name"] or updated[1]!=payload["normalized_name"]
+                    or updated[2]!=row[0] or updated[3] is not None or updated[4] is not None or updated[5] is not None):
+                    raise AdminIngredientConflict("ingredient changed or is no longer editable")
             connection.commit();committed=True
             return {"ingredient_id":payload["ingredient_id"],"name":payload["name"],
-                    "normalized_name":payload["normalized_name"],"identity_status":row[0]}
+                    "normalized_name":payload["normalized_name"],
+                    "identity_status":"DRAFT" if payload.get("make_available",False) else row[0]}
         except mysql.connector.Error as exc:
             connection.rollback()
             if exc.errno==1062:raise AdminIngredientConflict("ingredient name or ID already exists") from None
-            if exc.errno in (1142,1146,1227):raise AdminWriteUnavailable("ingredient writer grant or migration is missing") from None
+            if exc.errno in (1142,1143,1146,1227):raise AdminWriteUnavailable("ingredient writer grant or migration is missing") from None
             raise
         except Exception:
             if not committed:connection.rollback()
@@ -1139,7 +1230,7 @@ class MySQLRepository:
             return {"ingredient_id":payload["ingredient_id"],"is_active":payload["is_active"]}
         except mysql.connector.Error as exc:
             connection.rollback()
-            if exc.errno in (1142,1146,1227):raise AdminWriteUnavailable("ingredient writer grant or migration is missing") from None
+            if exc.errno in (1142,1143,1146,1227):raise AdminWriteUnavailable("ingredient writer grant or migration is missing") from None
             raise
         except Exception:
             if not committed:connection.rollback()
@@ -1864,6 +1955,13 @@ class MySQLRepository:
         return admin_detail(connection,recipe_id)
 
     def admin_update_legacy_recipe(self,payload,author):
+        from source.server.legacy_recipe_overlays import update
+        try:return update(self,payload,author)
+        except mysql.connector.Error as exc:
+            if exc.errno==1146:raise AdminSchemaUnavailable("legacy recipe overlay migration is not installed") from None
+            raise
+
+    def admin_restore_legacy_recipe_snapshot(self,payload,author):
         from source.server.legacy_recipe_overlays import update
         try:return update(self,payload,author)
         except mysql.connector.Error as exc:

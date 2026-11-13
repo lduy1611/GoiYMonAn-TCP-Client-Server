@@ -26,7 +26,8 @@
           envelope.error?.message||'Không thể hoàn tất yêu cầu.';
         throw new Error(text);
       }
-      location.assign('/');
+      const destination=form.dataset.next||'/';
+      location.assign(destination.startsWith('/')&&!destination.startsWith('//')?destination:'/');
     }catch(error){message.textContent=error instanceof TypeError?'Không kết nối được máy chủ. Hãy thử lại.':error.message;message.classList.add('error');button.disabled=false;}
   });
 })();

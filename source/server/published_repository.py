@@ -112,9 +112,17 @@ class PublishedRepository:
                 WHERE ({where}) ORDER BY i.id""",tuple(params))
         except Exception as exc:
             if getattr(exc,"errno",None)!=1146:raise
-            stored=[(*row,1) for row in self.legacy._fetchall(connection,
-                f"SELECT i.id,i.canonical_name FROM v2_ingredients i WHERE ({where}) ORDER BY i.id",
-                tuple(params))]
+            # The core legacy-only deployment has no v2 ingredient tables yet.
+            # Missing the optional activation table falls back to the core v2
+            # table; if that table is absent too, the published ingredient
+            # projection is simply the active legacy catalog.
+            try:
+                stored=[(*row,1) for row in self.legacy._fetchall(connection,
+                    f"SELECT i.id,i.canonical_name FROM v2_ingredients i WHERE ({where}) ORDER BY i.id",
+                    tuple(params))]
+            except Exception as missing:
+                if getattr(missing,"errno",None)!=1146:raise
+                stored=[]
         needle=ingredient_search_normalize(query.strip()) if query else ""
         for ingredient_id,name,is_active in stored:
             public_id=V2_OFFSET+int(ingredient_id)

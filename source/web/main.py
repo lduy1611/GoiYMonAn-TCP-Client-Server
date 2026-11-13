@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import json
+import base64
+import binascii
 import hmac
 import threading
 import time
@@ -33,6 +35,12 @@ app = FastAPI(title="Hôm nay ăn gì?", version="1.2.0")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 _GATEWAY_LOG_PATH = Path(os.getenv("FASTAPI_GATEWAY_LOG_PATH", BASE_DIR.parents[1] / "statics/runtime/fastapi_gateway.jsonl"))
 _GATEWAY_LOG_LOCK = threading.Lock()
+_FEEDBACK_RATE_LOCK = threading.Lock()
+_FEEDBACK_RATE_BUCKETS: dict[str, list[float]] = {}
+
+
+def _unified_schema_mode() -> bool:
+    return os.getenv("UNIFIED_SCHEMA_MODE") == "1"
 
 
 def _gateway_log(**fields: Any) -> None:
@@ -45,6 +53,22 @@ def _gateway_log(**fields: Any) -> None:
                 stream.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError:
         return
+
+
+def _feedback_rate_allowed(address: str, *, now: float | None = None) -> bool:
+    """Per-process guest-friendly limiter: at most five submissions per 15 min/IP."""
+    current = time.monotonic() if now is None else now
+    with _FEEDBACK_RATE_LOCK:
+        bucket = [stamp for stamp in _FEEDBACK_RATE_BUCKETS.get(address, []) if current - stamp < 900]
+        if len(bucket) >= 5:
+            _FEEDBACK_RATE_BUCKETS[address] = bucket
+            return False
+        bucket.append(current)
+        _FEEDBACK_RATE_BUCKETS[address] = bucket
+        if len(_FEEDBACK_RATE_BUCKETS) > 2048:
+            for key in [key for key, values in _FEEDBACK_RATE_BUCKETS.items() if not values or current - values[-1] >= 900][:512]:
+                _FEEDBACK_RATE_BUCKETS.pop(key, None)
+        return True
 
 
 class RecommendRequest(BaseModel):
@@ -86,6 +110,11 @@ class UserLoginRequest(BaseModel):
     password:StrictStr=Field(min_length=1,max_length=256)
 
 
+class AchievementCommentRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    body:StrictStr=Field(min_length=1,max_length=2000)
+
+
 class AdminUserStatusRequest(BaseModel):
     model_config=ConfigDict(extra="forbid")
     account_status:Literal["ACTIVE","LOCKED"]
@@ -100,9 +129,37 @@ class AdminIngredientLine(BaseModel):
     model_config=ConfigDict(extra="forbid")
     ingredient_id:StrictInt=Field(gt=0,lt=2**64)
     quantity_raw:StrictStr|None=Field(default=None,max_length=255)
-    # Accepted only for compatibility with older Admin clients. Catalog saves
-    # normalize every Admin-managed line to required before forwarding to TCP.
-    requirement:Literal["required","optional","unknown"]="required"
+    requirement:Literal["required","optional"]="required"
+    amount_kind:Literal["exact","range","to_taste","as_needed","unknown"]="unknown"
+    amount_min:StrictStr|None=Field(default=None,max_length=32)
+    amount_max:StrictStr|None=Field(default=None,max_length=32)
+    unit_id:StrictInt|None=Field(default=None,ge=1,le=65535)
+    ingredient_form:StrictStr|None=Field(default=None,max_length=120)
+    measurement_basis:Literal["gross","edible","prepared","unknown"]="unknown"
+    purpose:Literal["main","seasoning","cooking_medium","garnish","unknown"]="unknown"
+    scaling_mode:Literal["linear","fixed","unknown"]="unknown"
+
+
+class AdminRecipeStep(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    instruction:StrictStr=Field(min_length=1,max_length=5000)
+    duration_minutes:StrictInt|None=Field(default=None,ge=0,le=1440)
+    heat_level:StrictStr|None=Field(default=None,max_length=40)
+
+
+class AdminRecipeTag(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    tag_type:Literal["diet","region","season","occasion"]
+    code:StrictStr=Field(min_length=1,max_length=48,pattern=r"^[a-z0-9_]+$")
+
+
+class AdminDraftIngredientLine(BaseModel):
+    # Unreviewed legacy v2 drafts allow unknown requirements. Unified recipe
+    # saves still use AdminIngredientLine's required/optional-only contract.
+    model_config=ConfigDict(extra="forbid")
+    ingredient_id:StrictInt=Field(gt=0,lt=2**64)
+    quantity_raw:StrictStr|None=Field(default=None,max_length=255)
+    requirement:Literal["required","optional","unknown"]="unknown"
 
 
 class AdminDraftRequest(BaseModel):
@@ -111,7 +168,7 @@ class AdminDraftRequest(BaseModel):
     description:StrictStr=Field(default="",max_length=1000)
     instructions:StrictStr=Field(min_length=1,max_length=12000)
     minutes:StrictInt|None=Field(default=None,ge=1,le=240)
-    ingredients:list[AdminIngredientLine]=Field(min_length=1,max_length=50)
+    ingredients:list[AdminDraftIngredientLine]=Field(min_length=1,max_length=50)
 
 
 class AdminRecipeSaveRequest(BaseModel):
@@ -119,9 +176,21 @@ class AdminRecipeSaveRequest(BaseModel):
     title:StrictStr=Field(min_length=1,max_length=255)
     description:StrictStr=Field(default="",max_length=1000)
     instructions:StrictStr=Field(min_length=1,max_length=12000)
-    minutes:StrictInt=Field(ge=1,le=240)
-    role:Literal["main","vegetable","soup"]
+    minutes:StrictInt=Field(ge=1,le=1440)
+    role:Literal["main","vegetable","soup","side","drink","starch","other"]
     ingredients:list[AdminIngredientLine]=Field(min_length=1,max_length=50)
+    portion_data_status:Literal["verified","estimated","needs_review"]|None=None
+    portion_data_evidence:StrictStr|None=Field(default=None,max_length=2000)
+    servings:StrictStr|None=Field(default=None,max_length=32)
+    minutes_prep:StrictInt|None=Field(default=None,ge=0,le=1440)
+    minutes_cook:StrictInt|None=Field(default=None,ge=0,le=1440)
+    steps:list[AdminRecipeStep]|None=Field(default=None,min_length=1,max_length=50)
+    source_url:StrictStr|None=Field(default=None,max_length=1000)
+    tags:list[AdminRecipeTag]|None=Field(default=None,max_length=16)
+    beverage_temperature:Literal["unspecified","hot","cold","both"]|None=None
+    beverage_light:StrictBool|None=None
+    is_non_alcoholic:StrictBool|None=None
+    is_visible:StrictBool|None=None
     idempotency_key:StrictStr|None=Field(default=None,min_length=36,max_length=36,pattern=r"^[0-9a-fA-F-]{36}$")
     expected_version:StrictStr|None=Field(default=None,min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$")
 
@@ -130,6 +199,19 @@ class AdminRecipeStateRequest(BaseModel):
     model_config=ConfigDict(extra="forbid")
     is_visible:StrictBool
     is_deleted:StrictBool
+
+
+class AdminAchievementDeleteCounts(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    posts:StrictInt=Field(ge=0)
+    comments:StrictInt=Field(ge=0)
+    images:StrictInt=Field(ge=0)
+
+
+class AdminPermanentRecipeDeleteRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    confirm_user_content_delete:StrictBool
+    expected_achievement_counts:AdminAchievementDeleteCounts
 
 
 class AdminLegacyIngredientLine(BaseModel):
@@ -212,11 +294,39 @@ class AdminSourceDecision(BaseModel):
 class AdminIngredientName(BaseModel):
     model_config=ConfigDict(extra="forbid")
     name:StrictStr=Field(min_length=2,max_length=255)
+    make_available:StrictBool|None=None
 
 
 class AdminIngredientActive(BaseModel):
     model_config=ConfigDict(extra="forbid")
     is_active:StrictBool
+
+
+class AdminTaxonomySave(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    kind:Literal["dish_type","classification"]
+    group:Literal["dish_type","region","diet","occasion","weather","cooking_method","main_ingredient"]
+    code:StrictStr=Field(min_length=2,max_length=48,pattern=r"^[a-z][a-z0-9_]{1,47}$")
+    label:StrictStr=Field(min_length=1,max_length=100)
+    description:StrictStr=Field(default="",max_length=2000)
+
+
+class AdminTaxonomyStatus(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    deleted:StrictBool
+
+
+class AdminRecipeTaxonomies(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    kind:Literal["dish_type","classification"]
+    tag_ids:list[StrictInt]=Field(max_length=100)
+
+    @field_validator("tag_ids")
+    @classmethod
+    def distinct_taxonomy_ids(cls,value):
+        if any(tag_id<1 for tag_id in value) or len(set(value))!=len(value):
+            raise ValueError("taxonomy IDs must be positive and distinct")
+        return value
 
 
 class AdminReviewAction(BaseModel):
@@ -248,10 +358,15 @@ def http_status_for_error(code: str) -> int:
     if code=="ADMIN_RECIPE_INVALID_DATA":return 422
     if code in {"ADMIN_REVIEW_BLOCKED","ADMIN_REVIEW_CONFLICT"}:return 409
     if code=="ADMIN_INGREDIENT_CONFLICT":return 409
+    if code=="ADMIN_TAXONOMY_CONFLICT":return 409
+    if code in {"ADMIN_RECIPE_DELETE_BLOCKED","ADMIN_INGREDIENT_DELETE_BLOCKED"}:return 409
     if code=="ADMIN_IMAGE_CONFLICT":return 409
     if code=="USER_ACCOUNT_CONFLICT":return 409
     if code in {"USER_UNAUTHORIZED","USER_LOCKED"}:return 401
     if code=="USER_CSRF":return 403
+    if code=="FEEDBACK_RATE_LIMITED":return 429
+    if code=="FORBIDDEN":return 403
+    if code=="ACHIEVEMENT_CONFLICT":return 409
     if code=="USER_ACCOUNT_UNAVAILABLE":return 503
     if code in {"DB_UNAVAILABLE", "ADMIN_WRITE_UNAVAILABLE", "ADMIN_SCHEMA_UNAVAILABLE"}:return 503
     if code in {"INVALID_REQUEST", "INVALID_PAYLOAD"}:
@@ -329,8 +444,6 @@ def _account_exchange(request,operation,payload):
     if data.get("role")=="ADMIN" and data.get("user_id"):
         admin_token,_=issue_admin_token(data["username"],account_uid=int(data["user_id"]))
         result.set_cookie(ADMIN_COOKIE,admin_token,max_age=3600,httponly=True,secure=secure,samesite="strict",path="/")
-    else:
-        result.delete_cookie(ADMIN_COOKIE,path="/",secure=secure,httponly=True,samesite="strict")
     return result
 
 
@@ -413,6 +526,12 @@ def call_tcp(request: Request, op: str, payload: dict[str, Any]) -> JSONResponse
             parsed = (MealPlanData if op == "GENERATE_MEAL_PLAN" else MealPlanV2Data).model_validate(response["data"])
             if op == "GENERATE_MEAL_PLAN_V2" and payload.get("people") is not None and parsed.people != payload["people"]:
                 raise ValueError("meal people changed")
+            if op == "GENERATE_MEAL_PLAN_V2" and parsed.layout_mode != payload.get("layout_mode", "automatic"):
+                raise ValueError("meal layout mode changed")
+            if op == "GENERATE_MEAL_PLAN_V2" and parsed.weather != payload.get("weather"):
+                raise ValueError("meal weather preference changed")
+            if op == "GENERATE_MEAL_PLAN_V2" and parsed.season != payload.get("season", "ALL"):
+                raise ValueError("meal season preference changed")
             if op == "GENERATE_MEAL_PLAN_V2" and payload.get("preferences"):
                 if parsed.preferences is None or parsed.preferences.model_dump(exclude_none=True) != payload["preferences"]:
                     raise ValueError("meal preferences changed")
@@ -438,23 +557,36 @@ def call_tcp(request: Request, op: str, payload: dict[str, Any]) -> JSONResponse
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html", context={"page_title": "Hôm nay ăn gì?"})
+    view=request.query_params.get("view", "fridge")
+    active_tab=view if view in {"explore", "fridge", "lunch"} else "fridge"
+    return templates.TemplateResponse(request=request, name="index.html", context={"page_title": "Hôm nay ăn gì?", "active_tab":active_tab,
+        "account_target":"/account/profile" if _user_claims(request) else "/account/login"})
 
 
 @app.get("/account/login",response_class=HTMLResponse)
-def user_login_page(request:Request):
+def user_login_page(request:Request, next: str = Query(default="", max_length=300)):
     if _user_claims(request):
-        return RedirectResponse("/",status_code=303)
+        destination=next if next.startswith("/") and not next.startswith("//") else "/"
+        return RedirectResponse(destination,status_code=303)
     return templates.TemplateResponse(request=request,name="account_auth.html",
-        context={"page_title":"Đăng nhập · Hôm nay ăn gì?","mode":"login"})
+        context={"page_title":"Đăng nhập · Hôm nay ăn gì?","mode":"login","next_url":next if next.startswith("/") and not next.startswith("//") else "/"})
 
 
 @app.get("/account/register",response_class=HTMLResponse)
-def user_register_page(request:Request):
+def user_register_page(request:Request, next: str = Query(default="", max_length=300)):
     if _user_claims(request):
-        return RedirectResponse("/",status_code=303)
+        destination=next if next.startswith("/") and not next.startswith("//") else "/"
+        return RedirectResponse(destination,status_code=303)
     return templates.TemplateResponse(request=request,name="account_auth.html",
-        context={"page_title":"Tạo tài khoản · Hôm nay ăn gì?","mode":"register"})
+        context={"page_title":"Tạo tài khoản · Hôm nay ăn gì?","mode":"register","next_url":next if next.startswith("/") and not next.startswith("//") else "/"})
+
+
+@app.get("/account/profile",response_class=HTMLResponse)
+def user_profile_page(request:Request):
+    if not _user_claims(request):
+        return RedirectResponse("/account/login",status_code=303)
+    return templates.TemplateResponse(request=request,name="account_profile.html",
+        context={"page_title":"Tài khoản của tôi · Hôm nay ăn gì?","active_tab":"account","account_target":"/account/profile"})
 
 
 @app.post("/api/auth/register")
@@ -486,7 +618,7 @@ def user_session(request:Request):
             upstream.delete_cookie(USER_COOKIE,path="/",httponly=True,samesite="lax")
         return upstream
     data=envelope.get("data") or {}
-    response=JSONResponse({**envelope,"data":{"authenticated":True,"username":data.get("username"),
+    response=JSONResponse({**envelope,"data":{"authenticated":True,"user_id":data.get("user_id"),"username":data.get("username"),
         "role":data.get("role"),"csrf_token":data.get("csrf_token")}},headers={"X-Request-ID":_request_id(request)})
     return response
 
@@ -501,7 +633,6 @@ def user_logout(request:Request):
     secure_setting=os.getenv("USER_COOKIE_SECURE")
     secure=(secure_setting.casefold() not in {"0","false","no"}) if secure_setting is not None else request.url.scheme=="https"
     response.delete_cookie(USER_COOKIE,path="/",secure=secure,httponly=True,samesite="lax")
-    response.delete_cookie(ADMIN_COOKIE,path="/",secure=secure,httponly=True,samesite="strict")
     return response
 
 
@@ -516,7 +647,8 @@ def admin_login_page(request:Request):
 def admin_page(request:Request):
     if not _admin_claims(request):
         return RedirectResponse("/admin/login",status_code=303)
-    return templates.TemplateResponse(request=request,name="admin.html",context={"page_title":"Admin · Quản lý công thức"})
+    return templates.TemplateResponse(request=request,name="admin.html",context={"page_title":"Admin · Quản lý công thức",
+        "unified_schema":_unified_schema_mode()})
 
 
 @app.post("/api/admin/login")
@@ -534,6 +666,351 @@ def admin_login(request:Request,body:AdminLoginRequest):
     response.set_cookie(ADMIN_COOKIE,token,max_age=3600,httponly=True,secure=secure,samesite="strict",path="/")
     response.headers["X-Request-ID"]=request_id
     return response
+
+
+def _achievement_urls(data, *, admin=False):
+    def attach(post):
+        if not isinstance(post, dict):
+            return
+        for image in post.get("images", []):
+            key = image.get("storage_key", "")
+            base = "/api/admin/achievements/media/" if admin else "/media/achievements/"
+            image["image_url"] = base + key + "?v=" + str(image.get("sha256", ""))
+    if isinstance(data, dict):
+        if "items" in data:
+            for item in data.get("items", []): attach(item)
+        if "post_id" in data: attach(data)
+    return data
+
+
+@app.get("/achievements", response_class=HTMLResponse)
+def achievements_page(request: Request):
+    return templates.TemplateResponse(request=request, name="achievements.html", context={
+        "page_title": "Thành quả · Hôm nay ăn gì?", "active_tab": "achievements",
+        "account_target": "/account/profile" if _user_claims(request) else "/account/login"})
+
+
+@app.get("/api/achievements")
+def achievements_list(request: Request, query: str = Query(default="", max_length=80),
+                      limit: int = Query(default=12, ge=1, le=30), offset: int = Query(default=0, ge=0, le=100000)):
+    response = call_tcp(request, "ACHIEVEMENT_LIST", {"query": query, "limit": limit, "offset": offset})
+    envelope = _tcp_envelope(response)
+    if envelope.get("ok") is True:
+        data = _achievement_urls(envelope.get("data") or {})
+        return JSONResponse({**envelope, "data": data}, status_code=response.status_code, headers={"X-Request-ID": _request_id(request)})
+    return response
+
+
+@app.get("/api/achievements/{post_id}")
+def achievement_get(request: Request, post_id: int = FastAPIPath(ge=1, lt=2**64)):
+    response = call_tcp(request, "ACHIEVEMENT_GET", {"post_id": post_id})
+    envelope = _tcp_envelope(response)
+    if envelope.get("ok") is True:
+        return JSONResponse({**envelope, "data": _achievement_urls(envelope.get("data") or {})},
+                            status_code=response.status_code, headers={"X-Request-ID": _request_id(request)})
+    return response
+
+
+@app.post("/api/achievements")
+async def achievement_create(request: Request):
+    auth, error = _user_tcp(request, {}, csrf=request.headers.get("x-csrf-token", ""))
+    if error:
+        return error
+    declared = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if declared != "application/json":
+        return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Send achievement content as JSON."), status_code=422)
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > 22 * 1024 * 1024:
+            return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Combined photo upload is too large."), status_code=413)
+        raw.extend(chunk)
+    try:
+        body = json.loads(raw.decode("utf-8"))
+        if not isinstance(body, dict) or set(body) != {"recipe_id", "description", "changed_ingredients", "request_key", "images"}:
+            raise ValueError
+        if not isinstance(body["images"], list) or not 1 <= len(body["images"]) <= 3:
+            raise ValueError
+        from source.web.achievement_images import validate_image, write_image, storage_root, delete_image
+        saved_keys, image_rows = [], []
+        prepared = []
+        for item in body["images"]:
+            if not isinstance(item, dict) or set(item) != {"media_type", "data_base64"} or not isinstance(item["data_base64"], str):
+                raise ValueError
+            binary = base64.b64decode(item["data_base64"], validate=True)
+            if len(binary) > 5 * 1024 * 1024:
+                return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Each photo must be 5 MB or smaller."), status_code=413)
+            normalized, metadata = validate_image(binary, item["media_type"])
+            prepared.append((normalized, metadata))
+        for normalized, metadata in prepared:
+            key, _path = write_image(normalized, str(metadata["extension"]), storage_root())
+            saved_keys.append(key)
+            image_rows.append({key_name: metadata[key_name] for key_name in ("media_type", "byte_size", "width", "height", "sha256")})
+            image_rows[-1]["storage_key"] = key
+        payload = {key: body[key] for key in ("recipe_id", "description", "changed_ingredients", "request_key")}
+        payload["images"] = image_rows
+        response = call_tcp(request, "ACHIEVEMENT_CREATE", {**auth, **payload})
+        envelope = _tcp_envelope(response)
+        if response.status_code >= 400 or envelope.get("ok") is not True:
+            # The create is idempotent. Probe its request key before removing any
+            # files, since a transport timeout can happen after MySQL commits.
+            probe = call_tcp(request, "ACHIEVEMENT_CREATE_STATUS", {**auth, "request_key": body["request_key"]})
+            probe_envelope = _tcp_envelope(probe)
+            post = ((probe_envelope.get("data") or {}).get("achievement") if probe.status_code < 400 and probe_envelope.get("ok") is True else None)
+            if post:
+                for key in saved_keys:
+                    delete_image(key, storage_root())
+                return JSONResponse({"version": 1, "request_id": _request_id(request), "ok": True,
+                    "data": {"post_id": post["post_id"], "created": False, "url": "/achievements?post_id=" + post["post_id"]}, "error": None})
+            for key in saved_keys:
+                delete_image(key, storage_root())
+            return response
+        data = envelope.get("data") or {}
+        if data.get("created") is False:
+            for key in saved_keys:
+                delete_image(key, storage_root())
+        data["url"] = "/achievements?post_id=" + str(data.get("post_id", ""))
+        return JSONResponse({**envelope, "data": data}, status_code=response.status_code,
+                            headers={"X-Request-ID": _request_id(request)})
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, TypeError, binascii.Error):
+        try:
+            for key in saved_keys:
+                delete_image(key, storage_root())
+        except UnboundLocalError:
+            pass
+        return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Check the achievement text and choose valid JPG, PNG or WebP photos."), status_code=422)
+
+
+@app.post("/api/achievements/{post_id}/comments")
+def achievement_comment_create(request: Request, body: AchievementCommentRequest, post_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _user_tcp(request, {"post_id": post_id, **body.model_dump()}, csrf=request.headers.get("x-csrf-token", ""))
+    return error or call_tcp(request, "ACHIEVEMENT_COMMENT_CREATE", auth)
+
+
+@app.get("/media/achievements/{storage_key}")
+def achievement_image_file(request: Request, storage_key: str = FastAPIPath(min_length=36, max_length=36), admin: bool = False):
+    from hashlib import sha256
+    from source.web.achievement_images import safe_image_path, storage_root, RecipeImageError
+    if admin:
+        auth, auth_error = _admin_tcp(request, {})
+        if auth_error: return auth_error
+        metadata = call_tcp(request, "ADMIN_ACHIEVEMENT_IMAGE_GET", {**auth, "storage_key": storage_key})
+    else:
+        metadata = call_tcp(request, "ACHIEVEMENT_IMAGE_GET", {"storage_key": storage_key})
+    envelope = _tcp_envelope(metadata)
+    if metadata.status_code >= 400 or envelope.get("ok") is not True:
+        return JSONResponse(error_response(_request_id(request), "NOT_FOUND", "Achievement image not found."), status_code=404)
+    image = envelope.get("data") or {}
+    try:
+        path = safe_image_path(storage_root(), storage_key)
+        content = path.read_bytes()
+    except (RecipeImageError, OSError):
+        return JSONResponse(error_response(_request_id(request), "NOT_FOUND", "Achievement image not found."), status_code=404)
+    if len(content) != image.get("byte_size") or sha256(content).hexdigest() != image.get("sha256"):
+        return JSONResponse(error_response(_request_id(request), "NOT_FOUND", "Achievement image integrity check failed."), status_code=404)
+    return Response(content, media_type=image.get("media_type"), headers={"Cache-Control":"private, no-store", "X-Content-Type-Options":"nosniff"})
+
+
+@app.post("/api/feedback")
+async def feedback_create(request: Request):
+    address = request.client.host if request.client else "unknown"
+    if not _feedback_rate_allowed(address):
+        return JSONResponse(error_response(_request_id(request), "FEEDBACK_RATE_LIMITED", "Bạn đã gửi nhiều góp ý trong thời gian ngắn. Hãy thử lại sau."), status_code=429)
+    token = request.cookies.get(USER_COOKIE)
+    payload: dict[str, Any] = {}
+    if token:
+        claims = _user_claims(request)
+        if claims is None:
+            return JSONResponse(error_response(_request_id(request), "USER_UNAUTHORIZED", "Phiên User không hợp lệ. Hãy đăng nhập lại hoặc đăng xuất rồi gửi góp ý."), status_code=401)
+        if not hmac.compare_digest(request.headers.get("x-csrf-token", ""), claims["csrf"]):
+            return JSONResponse(error_response(_request_id(request), "USER_CSRF", "Mã bảo vệ yêu cầu không hợp lệ."), status_code=403)
+        payload["session_token"] = token
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Dữ liệu góp ý phải ở dạng JSON."), status_code=422)
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > 7 * 1024 * 1024:
+            return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Tổng dữ liệu góp ý vượt quá giới hạn."), status_code=413)
+        raw.extend(chunk)
+    saved_key = None
+    try:
+        body = json.loads(raw.decode("utf-8"))
+        if not isinstance(body, dict) or set(body) != {"category", "content", "request_key", "image"}:
+            raise ValueError("Các trường góp ý không hợp lệ.")
+        if not isinstance(body["category"], str) or body["category"] not in {"bug", "feature", "other"}:
+            raise ValueError("Hãy chọn loại góp ý hợp lệ.")
+        if not isinstance(body["content"], str) or not 1 <= len(body["content"].strip()) <= 3000:
+            raise ValueError("Nội dung góp ý bắt buộc và tối đa 3000 ký tự.")
+        if not isinstance(body["request_key"], str):
+            raise ValueError("Mã gửi góp ý không hợp lệ.")
+        uuid.UUID(body["request_key"])
+        image_metadata = None
+        if body["image"] is not None:
+            item = body["image"]
+            if not isinstance(item, dict) or set(item) != {"media_type", "data_base64"} or not isinstance(item["data_base64"], str):
+                raise ValueError("Ảnh đính kèm không hợp lệ.")
+            binary = base64.b64decode(item["data_base64"], validate=True)
+            if len(binary) > 5 * 1024 * 1024:
+                return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Ảnh đính kèm tối đa 5 MB."), status_code=413)
+            from source.web.feedback_images import validate_image, write_image, storage_root
+            normalized, image_metadata = validate_image(binary, item["media_type"])
+            saved_key, _ = write_image(normalized, str(image_metadata["extension"]), storage_root())
+            image_metadata["storage_key"] = saved_key
+            image_metadata = {key: image_metadata[key] for key in ("storage_key", "media_type", "byte_size", "width", "height", "sha256")}
+        payload.update({"category": body["category"], "content": body["content"].strip(),
+                        "request_key": body["request_key"], "image": image_metadata})
+        response = call_tcp(request, "FEEDBACK_CREATE", payload)
+        envelope = _tcp_envelope(response)
+        if response.status_code >= 400 or envelope.get("ok") is not True:
+            if saved_key:
+                from source.web.feedback_images import delete_image, storage_root
+                delete_image(saved_key, storage_root())
+            return response
+        data = envelope.get("data") or {}
+        if data.get("created") is False and saved_key:
+            from source.web.feedback_images import delete_image, storage_root
+            delete_image(saved_key, storage_root())
+        return JSONResponse(envelope, status_code=response.status_code, headers={"X-Request-ID": _request_id(request)})
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, TypeError, binascii.Error) as exc:
+        if saved_key:
+            from source.web.feedback_images import delete_image, storage_root
+            delete_image(saved_key, storage_root())
+        message = str(exc) or "Không đọc được nội dung góp ý hoặc ảnh đính kèm."
+        return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", message), status_code=422)
+
+
+@app.get("/api/admin/feedback")
+def admin_feedback_list(request: Request, status: Literal["all", "open", "resolved"] = "all",
+                        limit: int = Query(default=20, ge=1, le=100), offset: int = Query(default=0, ge=0)):
+    auth, error = _admin_tcp(request, {})
+    if error: return error
+    response = call_tcp(request, "ADMIN_FEEDBACK_LIST", {**auth, "status": status, "limit": limit, "offset": offset})
+    envelope = _tcp_envelope(response)
+    if response.status_code < 400 and envelope.get("ok") is True:
+        for item in (envelope.get("data") or {}).get("items", []):
+            if item.get("image"):
+                item["image"]["image_url"] = "/api/admin/feedback/media/" + item["image"]["storage_key"]
+        return JSONResponse(envelope, status_code=response.status_code, headers={"X-Request-ID": _request_id(request)})
+    return response
+
+
+@app.get("/api/admin/feedback/media/{storage_key}")
+def admin_feedback_image(request: Request, storage_key: str = FastAPIPath(min_length=36, max_length=36)):
+    auth, error = _admin_tcp(request, {})
+    if error: return error
+    response = call_tcp(request, "ADMIN_FEEDBACK_IMAGE_GET", {**auth, "storage_key": storage_key})
+    envelope = _tcp_envelope(response)
+    if response.status_code >= 400 or envelope.get("ok") is not True:
+        return JSONResponse(error_response(_request_id(request), "NOT_FOUND", "Không tìm thấy ảnh góp ý."), status_code=404)
+    image = envelope.get("data") or {}
+    from hashlib import sha256
+    from source.web.feedback_images import storage_root, safe_image_path, RecipeImageError
+    try:
+        content = safe_image_path(storage_root(), storage_key).read_bytes()
+    except (OSError, RecipeImageError):
+        return JSONResponse(error_response(_request_id(request), "NOT_FOUND", "Không tìm thấy ảnh góp ý."), status_code=404)
+    if len(content) != image.get("byte_size") or sha256(content).hexdigest() != image.get("sha256"):
+        return JSONResponse(error_response(_request_id(request), "NOT_FOUND", "Ảnh góp ý không vượt qua kiểm tra toàn vẹn."), status_code=404)
+    return Response(content, media_type=image.get("media_type"), headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@app.get("/api/admin/feedback/{feedback_id}")
+def admin_feedback_get(request: Request, feedback_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _admin_tcp(request, {"feedback_id": feedback_id})
+    if error: return error
+    return call_tcp(request, "ADMIN_FEEDBACK_GET", auth)
+
+
+@app.patch("/api/admin/feedback/{feedback_id}/status")
+def admin_feedback_status(request: Request, feedback_id: int = FastAPIPath(ge=1, lt=2**64), body: dict[str, Any] | None = None):
+    auth, error = _admin_tcp(request, {"feedback_id": feedback_id}, csrf=request.headers.get("x-csrf-token", ""))
+    if error: return error
+    if not isinstance(body, dict) or set(body) != {"status"} or not isinstance(body["status"], str) or body["status"] not in {"open", "resolved"}:
+        return JSONResponse(error_response(_request_id(request), "INVALID_PAYLOAD", "Trạng thái góp ý không hợp lệ."), status_code=422)
+    return call_tcp(request, "ADMIN_FEEDBACK_SET_STATUS", {**auth, "status": body["status"]})
+
+
+@app.delete("/api/admin/feedback/{feedback_id}")
+def admin_feedback_delete(request: Request, feedback_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _admin_tcp(request, {"feedback_id": feedback_id}, csrf=request.headers.get("x-csrf-token", ""))
+    if error: return error
+    response = call_tcp(request, "ADMIN_FEEDBACK_DELETE", auth)
+    envelope = _tcp_envelope(response)
+    if response.status_code < 400 and envelope.get("ok") is True:
+        key = (envelope.get("data") or {}).get("image_storage_key")
+        if key:
+            from source.web.feedback_images import delete_image, storage_root
+            pending = not delete_image(key, storage_root())
+            envelope["data"].pop("image_storage_key", None)
+            envelope["data"]["image_cleanup_pending"] = pending
+            return JSONResponse(envelope, status_code=response.status_code, headers={"X-Request-ID": _request_id(request)})
+    return response
+
+
+@app.delete("/api/achievements/{post_id}")
+def achievement_delete(request: Request, post_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _user_tcp(request, {"post_id": post_id}, csrf=request.headers.get("x-csrf-token", ""))
+    if error:
+        return error
+    response = call_tcp(request, "ACHIEVEMENT_POST_DELETE", auth)
+    envelope = _tcp_envelope(response)
+    if response.status_code < 400 and envelope.get("ok") is True:
+        from source.web.achievement_images import delete_image
+        for key in (envelope.get("data") or {}).get("storage_keys", []): delete_image(key)
+    return response
+
+
+@app.delete("/api/achievements/comments/{comment_id}")
+def achievement_comment_delete(request: Request, comment_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _user_tcp(request, {"comment_id": comment_id}, csrf=request.headers.get("x-csrf-token", ""))
+    return error or call_tcp(request, "ACHIEVEMENT_COMMENT_DELETE", auth)
+
+
+@app.get("/api/admin/achievements")
+def admin_achievements(request: Request, query: str = Query(default="", max_length=80),
+                       limit: int = Query(default=20, ge=1, le=30), offset: int = Query(default=0, ge=0, le=100000)):
+    auth, error = _admin_tcp(request, {"query": query, "limit": limit, "offset": offset})
+    if error: return error
+    response = call_tcp(request, "ADMIN_ACHIEVEMENT_LIST", auth)
+    envelope = _tcp_envelope(response)
+    if envelope.get("ok") is True:
+        return JSONResponse({**envelope, "data": _achievement_urls(envelope.get("data") or {}, admin=True)},
+                            status_code=response.status_code, headers={"X-Request-ID": _request_id(request)})
+    return response
+
+
+@app.get("/api/admin/achievements/media/{storage_key}")
+def admin_achievement_image_file(request: Request, storage_key: str = FastAPIPath(min_length=36, max_length=36)):
+    return achievement_image_file(request, storage_key, admin=True)
+
+
+@app.get("/api/admin/achievements/{post_id}")
+def admin_achievement_get(request: Request, post_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _admin_tcp(request, {"post_id": post_id})
+    if error: return error
+    response = call_tcp(request, "ADMIN_ACHIEVEMENT_GET", auth)
+    envelope = _tcp_envelope(response)
+    if envelope.get("ok") is True:
+        return JSONResponse({**envelope, "data": _achievement_urls(envelope.get("data") or {}, admin=True)},
+                            status_code=response.status_code, headers={"X-Request-ID": _request_id(request)})
+    return response
+
+
+@app.delete("/api/admin/achievements/{post_id}")
+def admin_achievement_delete(request: Request, post_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _admin_tcp(request, {"post_id": post_id}, csrf=request.headers.get("x-csrf-token", ""))
+    if error: return error
+    response = call_tcp(request, "ADMIN_ACHIEVEMENT_POST_DELETE", auth)
+    envelope = _tcp_envelope(response)
+    if response.status_code < 400 and envelope.get("ok") is True:
+        from source.web.achievement_images import delete_image
+        for key in (envelope.get("data") or {}).get("storage_keys", []): delete_image(key)
+    return response
+
+
+@app.delete("/api/admin/achievements/comments/{comment_id}")
+def admin_achievement_comment_delete(request: Request, comment_id: int = FastAPIPath(ge=1, lt=2**64)):
+    auth, error = _admin_tcp(request, {"comment_id": comment_id}, csrf=request.headers.get("x-csrf-token", ""))
+    return error or call_tcp(request, "ADMIN_ACHIEVEMENT_COMMENT_DELETE", auth)
 
 
 @app.get("/api/admin/session")
@@ -566,9 +1043,11 @@ def admin_dashboard(request:Request):
 
 @app.get("/api/admin/recipes")
 def admin_recipes(request:Request,query:str=Query(default="",max_length=80),limit:int=Query(default=20,ge=1,le=50),
-                  offset:int=Query(default=0,ge=0,le=10000),role:Literal["main","vegetable","soup"]|None=None,
-                  visibility:Literal["visible","hidden","deleted"]|None=None,max_minutes:int|None=Query(default=None,ge=1,le=240)):
+                  offset:int=Query(default=0,ge=0,le=10000),role:Literal["main","vegetable","soup","side","drink","starch","other"]|None=None,
+                  portion_filter:Literal["missing","structured","verified","estimated","needs_review"]|None=None,
+                  visibility:Literal["visible","hidden","deleted"]|None=None,max_minutes:int|None=Query(default=None,ge=1,le=1440)):
     payload={"query":query,"limit":limit,"offset":offset}
+    if portion_filter is not None:payload["portion_filter"]=portion_filter
     if role is not None:payload["role"]=role
     if visibility is not None:payload["visibility"]=visibility
     if max_minutes is not None:payload["max_minutes"]=max_minutes
@@ -658,15 +1137,15 @@ def admin_restore_recipe_snapshot(request:Request,recipe_id:int=FastAPIPath(ge=1
         return JSONResponse(error_response(_request_id(request),"ADMIN_RECIPE_CONFLICT","recipe changed after the restore screen was opened; reload before restoring"),status_code=409)
     fields=snapshot.get("fields") or {}
     if kind=="legacy":
-        payload={"recipe_id":recipe_id,"title":fields.get("title"),"description":fields.get("description"),
+        payload={"kind":"legacy","recipe_id":recipe_id,"title":fields.get("title"),"description":fields.get("description"),
             "instructions":fields.get("instructions"),"minutes":fields.get("minutes"),"is_visible":fields.get("is_visible"),
             "ingredients":fields.get("ingredients"),"expected_version":current_version,"admin_token":auth["admin_token"]}
-        return call_tcp(request,"ADMIN_UPDATE_LEGACY_RECIPE",payload)
-    payload={"recipe_id":recipe_id,"revision_id":snapshot["revision_id"],"title":fields.get("title"),
+        return call_tcp(request,"ADMIN_RESTORE_RECIPE_SNAPSHOT",payload)
+    payload={"kind":"v2","recipe_id":recipe_id,"revision_id":snapshot["revision_id"],"title":fields.get("title"),
         "description":fields.get("description"),"instructions":fields.get("instructions"),"minutes":fields.get("minutes"),
         "role":fields.get("role"),"ingredients":fields.get("ingredients"),"expected_version":current_version,
         "admin_token":auth["admin_token"]}
-    return call_tcp(request,"ADMIN_SAVE_RECIPE",payload)
+    return call_tcp(request,"ADMIN_RESTORE_RECIPE_SNAPSHOT",payload)
 
 
 @app.patch("/api/admin/legacy-recipes/{recipe_id}/visibility")
@@ -679,9 +1158,18 @@ def admin_set_legacy_recipe_visibility(request:Request,recipe_id:int=FastAPIPath
 @app.get("/api/admin/ingredients")
 def admin_ingredients(request:Request,query:str=Query(default="",max_length=80),limit:int=Query(default=20,ge=1,le=50),
                       offset:int=Query(default=0,ge=0,le=1_000_000),active_only:bool=Query(default=False),
+                      status:str=Query(default="all",pattern="^(all|active|inactive)$"),
                       catalog:str=Query(default="shared",pattern="^(shared|v2)$")):
-    payload,error=_admin_tcp(request,{"query":query,"limit":limit,"offset":offset,"active_only":active_only,"catalog":catalog})
+    payload,error=_admin_tcp(request,{"query":query,"limit":limit,"offset":offset,"active_only":active_only,"status":status,"catalog":catalog})
     return error or call_tcp(request,"ADMIN_LIST_INGREDIENTS",payload)
+
+
+@app.get("/api/admin/units")
+def admin_units(request:Request):
+    if not _unified_schema_mode():
+        return JSONResponse(error_response(_request_id(request),"UNSUPPORTED_OPERATION","Đơn vị cấu trúc chỉ có trên catalog v3."),status_code=404)
+    payload,error=_admin_tcp(request,{})
+    return error or call_tcp(request,"ADMIN_LIST_UNITS",payload)
 
 
 @app.get("/api/admin/users")
@@ -707,14 +1195,14 @@ def admin_user_role(request:Request,user_id:str=FastAPIPath(pattern=r"^[0-9]{1,2
 
 @app.post("/api/admin/ingredients")
 def admin_create_ingredient(request:Request,body:AdminIngredientName):
-    payload,error=_admin_tcp(request,body.model_dump(),csrf=request.headers.get("x-csrf-token",""))
+    payload,error=_admin_tcp(request,body.model_dump(exclude_none=True),csrf=request.headers.get("x-csrf-token",""))
     return error or call_tcp(request,"ADMIN_CREATE_INGREDIENT",payload)
 
 
 @app.patch("/api/admin/ingredients/{ingredient_id}")
 def admin_update_ingredient(request:Request,ingredient_id:int=FastAPIPath(ge=1,lt=2**64),body:AdminIngredientName|None=None):
     if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","ingredient name is required"),status_code=422)
-    payload,error=_admin_tcp(request,{"ingredient_id":ingredient_id,**body.model_dump()},csrf=request.headers.get("x-csrf-token",""))
+    payload,error=_admin_tcp(request,{"ingredient_id":ingredient_id,**body.model_dump(exclude_none=True)},csrf=request.headers.get("x-csrf-token",""))
     return error or call_tcp(request,"ADMIN_UPDATE_INGREDIENT",payload)
 
 
@@ -723,6 +1211,60 @@ def admin_set_ingredient_active(request:Request,ingredient_id:int=FastAPIPath(ge
     if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","ingredient state is required"),status_code=422)
     payload,error=_admin_tcp(request,{"ingredient_id":ingredient_id,**body.model_dump()},csrf=request.headers.get("x-csrf-token",""))
     return error or call_tcp(request,"ADMIN_SET_INGREDIENT_ACTIVE",payload)
+
+
+@app.delete("/api/admin/ingredients/{ingredient_id}/permanent")
+def admin_ingredient_delete_permanent(request:Request,ingredient_id:int=FastAPIPath(ge=1,lt=2**64)):
+    payload,error=_admin_tcp(request,{"ingredient_id":ingredient_id},csrf=request.headers.get("x-csrf-token",""))
+    return error or call_tcp(request,"ADMIN_DELETE_INGREDIENT_PERMANENT",payload)
+
+
+@app.get("/api/admin/taxonomies")
+def admin_taxonomies(request:Request,kind:Literal["dish_type","classification"],query:str=Query(default="",max_length=80),
+                     group:Literal["dish_type","region","diet","occasion","weather","cooking_method","main_ingredient"]|None=None,
+                     status:Literal["active","deleted","all"]="active",limit:int=Query(default=50,ge=1,le=100),
+                     offset:int=Query(default=0,ge=0,le=10000)):
+    payload,error=_admin_tcp(request,{"kind":kind,"query":query,"group":group,"status":status,"limit":limit,"offset":offset})
+    return error or call_tcp(request,"ADMIN_LIST_TAXONOMIES",payload)
+
+
+@app.post("/api/admin/taxonomies")
+def admin_create_taxonomy(request:Request,body:AdminTaxonomySave):
+    payload,error=_admin_tcp(request,body.model_dump(),csrf=request.headers.get("x-csrf-token",""))
+    return error or call_tcp(request,"ADMIN_SAVE_TAXONOMY",payload)
+
+
+@app.patch("/api/admin/taxonomies/{tag_id}")
+def admin_update_taxonomy(request:Request,tag_id:int=FastAPIPath(ge=1,le=65535),body:AdminTaxonomySave|None=None):
+    if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","taxonomy values are required"),status_code=422)
+    payload,error=_admin_tcp(request,{"tag_id":tag_id,**body.model_dump()},csrf=request.headers.get("x-csrf-token",""))
+    return error or call_tcp(request,"ADMIN_SAVE_TAXONOMY",payload)
+
+
+@app.patch("/api/admin/taxonomies/{tag_id}/deleted")
+def admin_set_taxonomy_deleted(request:Request,tag_id:int=FastAPIPath(ge=1,le=65535),body:AdminTaxonomyStatus|None=None):
+    if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","taxonomy state is required"),status_code=422)
+    payload,error=_admin_tcp(request,{"tag_id":tag_id,**body.model_dump()},csrf=request.headers.get("x-csrf-token",""))
+    return error or call_tcp(request,"ADMIN_SET_TAXONOMY_DELETED",payload)
+
+
+@app.delete("/api/admin/taxonomies/{tag_id}/permanent")
+def admin_delete_taxonomy_permanent(request:Request,tag_id:int=FastAPIPath(ge=1,le=65535)):
+    payload,error=_admin_tcp(request,{"tag_id":tag_id},csrf=request.headers.get("x-csrf-token",""))
+    return error or call_tcp(request,"ADMIN_DELETE_TAXONOMY_PERMANENT",payload)
+
+
+@app.get("/api/admin/recipes/{recipe_id}/taxonomies")
+def admin_recipe_taxonomies(request:Request,recipe_id:int=FastAPIPath(ge=1,lt=2**64),kind:Literal["dish_type","classification"]=Query(...)):
+    payload,error=_admin_tcp(request,{"recipe_id":recipe_id,"kind":kind})
+    return error or call_tcp(request,"ADMIN_GET_RECIPE_TAXONOMIES",payload)
+
+
+@app.put("/api/admin/recipes/{recipe_id}/taxonomies")
+def admin_set_recipe_taxonomies(request:Request,recipe_id:int=FastAPIPath(ge=1,lt=2**64),body:AdminRecipeTaxonomies|None=None):
+    if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","recipe taxonomy values are required"),status_code=422)
+    payload,error=_admin_tcp(request,{"recipe_id":recipe_id,**body.model_dump()},csrf=request.headers.get("x-csrf-token",""))
+    return error or call_tcp(request,"ADMIN_SET_RECIPE_TAXONOMIES",payload)
 
 
 @app.patch("/api/admin/legacy-ingredients/{ingredient_id}")
@@ -755,8 +1297,20 @@ def admin_update_draft(request:Request,body:AdminDraftRequest,revision_id:int=Fa
 @app.post("/api/admin/catalog-recipes")
 def admin_save_recipe(request:Request,body:AdminRecipeSaveRequest):
     data=body.model_dump()
+    from source.server.beverages import FIELDS
+    for key in FIELDS:
+        if data.get(key) is None:data.pop(key,None)
     data.pop("expected_version",None)
-    data["ingredients"]=[{**line,"requirement":"required"} for line in data["ingredients"]]
+    if _unified_schema_mode():
+        data["steps"]=[step.model_dump() for step in body.steps] if body.steps is not None else None
+        if "source_url" not in body.model_fields_set:data.pop("source_url",None)
+        if "tags" not in body.model_fields_set:data.pop("tags",None)
+    else:
+        data.pop("source_url",None)
+        data.pop("tags",None)
+        for key in ("servings","minutes_prep","minutes_cook","steps","portion_data_status","portion_data_evidence"):
+            data.pop(key,None)
+        data["ingredients"]=[{"ingredient_id":line["ingredient_id"],"quantity_raw":line["quantity_raw"],"requirement":"required"} for line in data["ingredients"]]
     payload,error=_admin_tcp(request,data,csrf=request.headers.get("x-csrf-token",""))
     return error or call_tcp(request,"ADMIN_SAVE_RECIPE",payload)
 
@@ -767,7 +1321,19 @@ def admin_update_catalog_recipe(request:Request,recipe_id:int=FastAPIPath(ge=1,l
     if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","recipe fields are required"),status_code=422)
     data=body.model_dump()
     data.pop("idempotency_key",None)
-    data["ingredients"]=[{**line,"requirement":"required"} for line in data["ingredients"]]
+    from source.server.beverages import FIELDS
+    for key in FIELDS:
+        if data.get(key) is None:data.pop(key,None)
+    if _unified_schema_mode():
+        data["steps"]=[step.model_dump() for step in body.steps] if body.steps is not None else None
+        if "source_url" not in body.model_fields_set:data.pop("source_url",None)
+        if "tags" not in body.model_fields_set:data.pop("tags",None)
+    else:
+        data.pop("source_url",None)
+        data.pop("tags",None)
+        for key in ("servings","minutes_prep","minutes_cook","steps","portion_data_status","portion_data_evidence"):
+            data.pop(key,None)
+        data["ingredients"]=[{"ingredient_id":line["ingredient_id"],"quantity_raw":line["quantity_raw"],"requirement":"required"} for line in data["ingredients"]]
     payload={**data,"recipe_id":recipe_id,"revision_id":revision_id}
     signed,error=_admin_tcp(request,payload,csrf=request.headers.get("x-csrf-token",""))
     return error or call_tcp(request,"ADMIN_SAVE_RECIPE",signed)
@@ -778,6 +1344,32 @@ def admin_recipe_state(request:Request,recipe_id:int=FastAPIPath(ge=1,lt=2**64),
     if body is None:return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","recipe state is required"),status_code=422)
     payload,error=_admin_tcp(request,{"recipe_id":recipe_id,**body.model_dump()},csrf=request.headers.get("x-csrf-token",""))
     return error or call_tcp(request,"ADMIN_SET_RECIPE_LIFECYCLE",payload)
+
+
+@app.delete("/api/admin/catalog-recipes/{recipe_id}/permanent")
+def admin_recipe_delete_permanent(request:Request,recipe_id:int=FastAPIPath(ge=1,lt=2**64),
+                                  body:AdminPermanentRecipeDeleteRequest|None=None):
+    auth,error=_admin_tcp(request,{"recipe_id":recipe_id},csrf=request.headers.get("x-csrf-token",""))
+    if error:return error
+    if body is None:
+        return JSONResponse(error_response(_request_id(request),"INVALID_PAYLOAD","C\u1ea7n x\u00e1c nh\u1eadn x\u00f3a v\u0129nh vi\u1ec5n."),status_code=422)
+    payload={**auth,**body.model_dump()}
+    response=call_tcp(request,"ADMIN_DELETE_RECIPE_PERMANENT",payload)
+    envelope=_tcp_envelope(response)
+    if response.status_code==200 and envelope.get("ok") is True:
+        data=envelope.get("data") or {}
+        recipe_keys=data.pop("recipe_image_keys",[])
+        achievement_keys=data.pop("achievement_image_keys",[])
+        from source.web.recipe_images import delete_image as delete_recipe_image
+        from source.web.achievement_images import delete_image as delete_achievement_image
+        from source.web.achievement_images import storage_root as achievement_storage_root
+        # Attempt every unlink and use the separate storage root for user photos.
+        recipe_results=[delete_recipe_image(key) for key in recipe_keys]
+        achievement_root=achievement_storage_root()
+        achievement_results=[delete_achievement_image(key, achievement_root) for key in achievement_keys]
+        data["image_cleanup_pending"]=not (all(recipe_results) and all(achievement_results))
+        return JSONResponse(envelope,status_code=response.status_code,headers={"X-Request-ID":_request_id(request)})
+    return response
 
 
 def _tcp_envelope(response: JSONResponse):
@@ -924,11 +1516,13 @@ def recipe_page(request: Request, recipe_id: str):
     valid_id = recipe_id.isascii() and recipe_id.isdecimal() and len(recipe_id) <= 10 and valid_public_id(int(recipe_id))
     return templates.TemplateResponse(request=request, name="detail.html", context={
         "page_title": "Chi tiết món ăn", "recipe_id": int(recipe_id) if valid_id else 0,
-        "return_to": return_to}, status_code=200 if valid_id else 422)
+        "return_to": return_to, "active_tab":"meal" if return_to=="/meal-plan" else "explore",
+        "account_target":"/account/profile" if _user_claims(request) else "/account/login?next=" + f"/recipes/{recipe_id}%23achievement-form",
+        "user_authenticated":bool(_user_claims(request))}, status_code=200 if valid_id else 422)
 
 
 @app.get("/api/ingredients")
-def list_ingredients(request: Request, query: str = Query(default="", max_length=80), limit: int = Query(default=20, ge=1, le=50)):
+def list_ingredients(request: Request, query: str = Query(default="", max_length=80), limit: int = Query(default=20, ge=1, le=250)):
     return call_tcp(request, "LIST_INGREDIENTS", {"query": query, "limit": limit})
 
 
@@ -1009,7 +1603,8 @@ def meal_plan_page(request: Request):
         version = ""
     template = "meal_plan.html" if request.url.path == "/meal-plan/v1" else "meal_plan_v2.html"
     return templates.TemplateResponse(request=request, name=template, context={
-        "page_title": "Mâm cơm hôm nay", "classification_version": version})
+        "page_title": "Mâm cơm hôm nay", "classification_version": version, "active_tab":"meal",
+        "account_target":"/account/profile" if _user_claims(request) else "/account/login"})
 
 
 @app.post("/api/meal-plan")
@@ -1030,4 +1625,20 @@ def meal_plan_filters(request: Request, layout_support: bool = Query(default=Fal
 
 @app.post("/api/meal-plan/calculate")
 def calculate_meal_plan(request: Request, body: CalculationRequest):
-    return call_tcp(request, "CALCULATE_MEAL_PLAN", body.model_dump())
+    return call_tcp(request, "CALCULATE_MEAL_PLAN", body.model_dump(exclude_none=True))
+
+
+class MealAssessmentRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    request: MealPlanV2Request
+    query: StrictStr=Field(default="",max_length=80)
+    propose: bool=False
+    add_recipe_id: StrictInt|None=Field(default=None,gt=0)
+    remove_slot: StrictStr|None=Field(default=None,max_length=20)
+    adults: StrictInt|None=Field(default=None,ge=0,le=12)
+    children: StrictInt|None=Field(default=None,ge=0,le=12)
+
+
+@app.post("/api/meal-plan/assess")
+def assess_meal_plan(request: Request, body: MealAssessmentRequest):
+    return call_tcp(request, "ASSESS_MEAL_PLAN", body.model_dump(exclude_none=True))

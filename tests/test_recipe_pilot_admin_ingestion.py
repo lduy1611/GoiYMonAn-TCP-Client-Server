@@ -21,6 +21,7 @@ from source.database.migrate_v2 import (
     run_legacy_ingredient_admin_migration,
     run_admin_recipe_catalog_migration,
     run_legacy_recipe_catalog_ingredient_migration,
+    run_recipe_image_migration,
 )
 from source.server.main import TCPServer
 from source.server.repository import MySQLRepository
@@ -61,6 +62,7 @@ def _install_needed_migrations(connection):
     run_legacy_recipe_overlay_migration(connection, "apply")
     run_legacy_ingredient_admin_migration(connection, "apply")
     run_admin_recipe_catalog_migration(connection, "apply")
+    run_recipe_image_migration(connection, "apply")
     history = {row["version"] for row in sql(connection, f"SELECT version FROM {migrate_v2.HISTORY}")}
     assert v2_schema.VERSION in history and v2_admin_schema.VERSION in history
     assert "002_context_metadata" not in history
@@ -105,6 +107,7 @@ def test_pilot_ingredients_and_recipe_routes_are_truthfully_bounded_to_supported
     monkeypatch.setattr(repo, "_admin_writer", lambda: mysql.connector.connect(**{**config, "autocommit": False}))
     monkeypatch.setattr(repo, "admin_ingredient_writer_ready", lambda: True)
     monkeypatch.setattr(repo, "legacy_ingredient_admin_writer_ready", lambda _connection=None: True)
+    monkeypatch.setattr(repo, "_image_writer_grants", lambda _connection, _database: True)
     assert repo.legacy_recipe_shared_ingredient_ready()
 
     from source.server import main as server_main
@@ -327,20 +330,36 @@ def test_five_pilot_recipes_round_trip_through_admin_tcp_mysql_and_user(
     # than creating a second recipe.
     public_v2_recipe_id = 7980672317
     storage_recipe_id = public_v2_recipe_id - V2_OFFSET
+    selected_ingredients={891047879:"D\u1ea7u \u0103n",2865256237:"Mu\u1ed1i",3731415834:"\u0110\u01b0\u1eddng",
+                          2056836464:"Ti\u00eau \u0111en",3331361648:"H\u00e0nh t\u00edm"}
+    for iid in (*selected_ingredients,1216186474,2106964774,27048261,3284972646,*range(100001,100033)):
+        source_name=f"TEST_ONLY imported ingredient {iid}"
+        sql(connection,"INSERT INTO v2_ingredients(id,canonical_name,normalized_name,identity_status) "
+            "VALUES(%s,%s,%s,'NEEDS_VERIFICATION')",(iid,source_name,source_name.casefold()))
     sql(connection, "INSERT INTO v2_ingredients(id,legacy_ingredient_id,canonical_name,normalized_name) VALUES(50001,26,'Mắm ruốc','mắm ruốc')")
     sql(connection, "INSERT INTO v2_recipes(id,origin_kind,author_ref) VALUES(%s,'curated_new','TEST_ONLY existing catalog recipe')", (storage_recipe_id,))
     sql(connection, "INSERT INTO v2_recipe_revisions(id,recipe_id,revision_no,title,description,instructions,minutes,status) VALUES(9001,%s,1,'Trứng kho','','Sơ chế',30,'DRAFT')", (storage_recipe_id,))
-    sql(connection, "INSERT INTO v2_recipe_ingredient_lines(revision_id,line_no,ingredient_id,quantity_raw,requirement) VALUES(9001,1,50001,'20 g','required')")
+    sql(connection, "INSERT INTO v2_recipe_ingredient_lines(revision_id,line_no,ingredient_id,quantity_raw,requirement) VALUES(9001,1,50001,'20 g','optional')")
     sql(connection, "INSERT INTO v2_admin_recipe_catalog_overrides(v2_recipe_id,revision_id,role_code,direct_publication,is_visible,is_deleted,updated_by) VALUES(%s,9001,'main',1,1,0,'TEST_ONLY fixture')", (storage_recipe_id,))
+    sql(connection,"""INSERT INTO v2_recipe_image_overrides
+        (recipe_id,catalog_kind,legacy_recipe_id,v2_recipe_id,storage_key,media_type,byte_size,width,height,sha256,updated_by)
+        VALUES(7,'legacy',7,NULL,'testlegacyimage000000000000000000000000','image/jpeg',100,10,10,%s,'TEST_ONLY')""",("a"*64,))
+    sql(connection,"""INSERT INTO v2_recipe_image_overrides
+        (recipe_id,catalog_kind,legacy_recipe_id,v2_recipe_id,storage_key,media_type,byte_size,width,height,sha256,updated_by)
+        VALUES(%s,'v2',NULL,%s,'testv2image0000000000000000000000000000','image/png',100,10,10,%s,'TEST_ONLY')""",
+        (public_v2_recipe_id,storage_recipe_id,"b"*64))
 
     repo = MySQLRepository(config, pool_size=2)
     monkeypatch.setattr(repo, "_admin_writer", lambda: mysql.connector.connect(**{**config, "autocommit": False}))
     monkeypatch.setattr(repo, "admin_ingredient_writer_ready", lambda: True)
     monkeypatch.setattr(repo, "legacy_ingredient_admin_writer_ready", lambda _connection=None: True)
+    monkeypatch.setattr(repo, "_image_writer_grants", lambda _connection, _database: True)
     assert repo.legacy_recipe_shared_ingredient_ready()
 
     from source.server import main as server_main
     from source.web import main as web_main
+    from source.web import recipe_snapshots
+    monkeypatch.setattr(recipe_snapshots,"ROOT",tmp_path/"TEST_ONLY-recipe-snapshots")
     monkeypatch.setattr(server_main, "LOG_PATH", tmp_path / "TEST_ONLY-pilot-five-tcp.jsonl")
     monkeypatch.setattr(web_main, "_GATEWAY_LOG_PATH", tmp_path / "TEST_ONLY-pilot-five-http.jsonl")
     with socket.socket() as probe:
@@ -380,28 +399,43 @@ def test_five_pilot_recipes_round_trip_through_admin_tcp_mysql_and_user(
             assert catalog_by_id[3] == "Hành"
             assert catalog_by_id[26] == "Mắm ruốc"
 
-            # Each missing name is checked first, then added through the Admin
-            # HTTP -> TCP -> MySQL operation. Hành tím is a distinct new catalog
-            # identity; it is never aliased to or substituted for Hành (ID 3).
-            new_names = ("Dầu ăn", "Muối", "Đường", "Tiêu", "Hành tím")
-            new_ids = {}
-            for name in new_names:
-                found = client.get("/api/ingredients", params={"query": name, "limit": 50})
-                assert found.status_code == 200, found.text
-                exact = [row for row in found.json()["data"]["items"] if row["name"].casefold() == name.casefold()]
-                assert exact == [], f"TEST_ONLY seed already contains {name!r}; avoid a duplicate"
-                created = client.post("/api/admin/ingredients", json={"name": name}, headers=headers)
-                assert created.status_code == 200, created.text
-                ingredient_id = created.json()["data"]["ingredient_id"]
-                assert ingredient_id > 2**32 - 1 and ingredient_id != 3
-                new_ids[name] = ingredient_id
-                user_after = client.get("/api/ingredients", params={"query": name, "limit": 50}).json()["data"]["items"]
-                admin_after = client.get("/api/admin/ingredients", params={"query": name, "limit": 50}).json()["data"]["items"]
-                assert any(row["id"] == ingredient_id and row["name"] == name for row in user_after)
-                assert any(row["ingredient_id"] == ingredient_id and row["name"] == name for row in admin_after)
-            assert len(set(new_ids.values())) == len(new_names)
-            assert new_ids["Hành tím"] != 3
+            # Capture User behavior before changing any selected identity.
+            baseline_search=client.post("/api/search",json={"query":"C\u00e1 basa kho g\u1eebng","limit":20})
+            assert baseline_search.status_code==200,baseline_search.text
+            assert any(row["recipe_id"]==7 for row in baseline_search.json()["data"]["items"])
+            baseline_recommendations={}
+            for algorithm in ("baseline","proposed"):
+                response=client.post("/api/recommend",json={"ingredient_ids":[13],"algorithm":algorithm,"top_k":20})
+                assert response.status_code==200,response.text
+                ids=[row["recipe_id"] for row in response.json()["data"]["items"]]
+                assert len(ids)==len(set(ids))
+                baseline_recommendations[algorithm]=ids
+            baseline_meal_v1=client.post("/api/meal-plan",json={})
+            baseline_meal_v2=client.post("/api/meal-plan/v2",json={"people":4})
+            assert baseline_meal_v1.status_code==200 and baseline_meal_v1.json()["data"]["plan"] is not None
+            assert baseline_meal_v2.status_code==200 and baseline_meal_v2.json()["data"]["plan"] is not None
 
+            # Reuse the five selected identities; Hanh tim keeps a separate ID.
+            new_ids={name:V2_OFFSET+iid for iid,name in selected_ingredients.items()}
+            new_ids["Ti\u00eau"]=new_ids["Ti\u00eau \u0111en"]
+            for iid,name in selected_ingredients.items():
+                saved=client.patch(f"/api/admin/ingredients/{V2_OFFSET+iid}",
+                    json={"name":name,"make_available":True},headers=headers)
+                assert saved.status_code==200,saved.text
+                assert saved.json()["data"]["identity_status"]=="DRAFT"
+                assert saved.json()["data"]["ingredient_id"]==V2_OFFSET+iid
+            user_after=client.get("/api/ingredients?limit=100")
+            admin_after=[client.get(f"/api/admin/ingredients?catalog=shared&limit=50&offset={offset}") for offset in (0,50)]
+            assert user_after.status_code==200 and all(response.status_code==200 for response in admin_after)
+            user_pairs=[(row["id"],row["name"]) for row in user_after.json()["data"]["items"]]
+            admin_pairs=[(row["ingredient_id"],row["name"]) for response in admin_after for row in response.json()["data"]["items"]]
+            assert user_pairs==admin_pairs and len(user_pairs)==55
+            assert all((V2_OFFSET+iid,name) in user_pairs for iid,name in selected_ingredients.items())
+            assert (3,"H\u00e0nh") in user_pairs and (V2_OFFSET+3331361648,"H\u00e0nh t\u00edm") in user_pairs
+            unselected={1216186474,2106964774,27048261,3284972646,*range(100001,100033)}
+            assert not any(row[0]>V2_OFFSET and row[0]-V2_OFFSET in unselected for row in user_pairs)
+            assert sql(connection,"SELECT COUNT(*) n FROM v2_ingredients WHERE identity_status='NEEDS_VERIFICATION' AND id IN (%s)" % ",".join(["%s"]*len(unselected)),tuple(sorted(unselected)))[0]["n"]==len(unselected)
+            assert len(set(new_ids.values()))==5 and new_ids["H\u00e0nh t\u00edm"]!=3
             dossier = Path(__file__).resolve().parents[1] / "docs" / "data-normalization-pilot-5-admin-ready.md"
             text = dossier.read_text(encoding="utf-8")
             headings = list(re.finditer(r"(?m)^## ([1-5])\. (.+?) — (legacy ID|Admin ID hiện tại) (\d+)\s*$", text))
@@ -461,14 +495,25 @@ def test_five_pilot_recipes_round_trip_through_admin_tcp_mysql_and_user(
             # Verify all source ingredient IDs against User's original catalog.
             assert [item["recipe_id"] for item in parsed if item["kind"] == "legacy ID"] == [7, 6, 5, 4]
             assert [item["recipe_id"] for item in parsed if item["kind"] == "Admin ID hiện tại"] == [public_v2_recipe_id]
+            snapshots={}
+            originals={}
             for recipe in parsed:
                 if recipe["kind"] == "legacy ID":
                     legacy_id = recipe["recipe_id"]
                     before = client.get(f"/api/recipes/{legacy_id}")
                     assert before.status_code == 200, before.text
                     old = before.json()["data"]
+                    originals[legacy_id]=old
                     admin_before=client.get(f"/api/admin/legacy-recipes/{legacy_id}")
                     assert admin_before.status_code==200,admin_before.text
+                    snapshot_response=client.post(f"/api/admin/recipes/{legacy_id}/snapshot",
+                        json={"kind":"legacy"},headers=headers)
+                    assert snapshot_response.status_code==200,snapshot_response.text
+                    snapshots[legacy_id]=snapshot_response.json()["data"]["snapshot_id"]
+                    if legacy_id==7:
+                        assert snapshot_response.json()["data"]["checksum_sha256"]
+                        persisted=recipe_snapshots.load(snapshots[legacy_id])
+                        assert persisted["image"]["metadata"]["storage_key"]=="testlegacyimage000000000000000000000000"
                     saved = client.patch(f"/api/admin/legacy-recipes/{legacy_id}", json={
                         "title": recipe["title"], "description": recipe["description"],
                         "instructions": recipe["instructions"], "minutes": recipe["minutes"],
@@ -492,6 +537,15 @@ def test_five_pilot_recipes_round_trip_through_admin_tcp_mysql_and_user(
                     detail = client.get("/api/admin/revisions/9001")
                     assert detail.status_code == 200, detail.text
                     version = detail.json()["data"]["edit_version"]
+                    original_v2=client.get(f"/api/recipes/{public_v2_recipe_id}")
+                    assert original_v2.status_code==200,original_v2.text
+                    originals[public_v2_recipe_id]=original_v2.json()["data"]
+                    snapshot_response=client.post(f"/api/admin/recipes/{public_v2_recipe_id}/snapshot",
+                        json={"kind":"v2","revision_id":9001},headers=headers)
+                    assert snapshot_response.status_code==200,snapshot_response.text
+                    snapshots[public_v2_recipe_id]=snapshot_response.json()["data"]["snapshot_id"]
+                    persisted=recipe_snapshots.load(snapshots[public_v2_recipe_id])
+                    assert persisted["image"]["metadata"]["storage_key"]=="testv2image0000000000000000000000000000"
                     saved = client.patch(f"/api/admin/catalog-recipes/{public_v2_recipe_id}?revision_id=9001", json={
                         "title": recipe["title"], "description": recipe["description"],
                         "instructions": recipe["instructions"], "minutes": recipe["minutes"],
@@ -529,6 +583,53 @@ def test_five_pilot_recipes_round_trip_through_admin_tcp_mysql_and_user(
             assert meal_v2.status_code == 200, meal_v2.text
             assert meal_v2.json()["data"]["plan"] is not None
 
+            # Restore every selected recipe from its pre-save, checksummed
+            # snapshot. The version is re-read immediately before restore and
+            # the TCP repository checks it again under row locks.
+            for recipe in parsed:
+                rid=recipe["recipe_id"]
+                is_legacy=recipe["kind"]=="legacy ID"
+                current=(client.get(f"/api/admin/legacy-recipes/{rid}") if is_legacy
+                         else client.get("/api/admin/revisions/9001"))
+                assert current.status_code==200,current.text
+                restored=client.post(f"/api/admin/recipes/{rid}/restore",json={
+                    "snapshot_id":snapshots[rid],"expected_version":current.json()["data"]["edit_version"]},headers=headers)
+                assert restored.status_code==200,restored.text
+                public=client.get(f"/api/recipes/{rid}")
+                assert public.status_code==200,public.text
+                public_data=public.json()["data"]
+                old=originals[rid]
+                for field in ("title","description","instructions","minutes"):
+                    assert public_data[field]==old[field],(rid,field)
+                assert {line["id"] for line in public_data["ingredients"]}=={line["id"] for line in old["ingredients"]}
+                if is_legacy:
+                    assert [(line["id"],line["quantity"],line["is_required"]) for line in public_data["ingredients"]] == [
+                        (line["id"],line["quantity"],line["is_required"]) for line in old["ingredients"]]
+                else:
+                    restored_v2=client.get("/api/admin/revisions/9001")
+                    assert restored_v2.status_code==200,restored_v2.text
+                    assert sql(connection,"SELECT requirement,quantity_raw FROM v2_recipe_ingredient_lines WHERE revision_id=9001 AND ingredient_id=50001")[0] == {
+                        "requirement":"optional","quantity_raw":"20 g"}
+                found=client.post("/api/search",json={"query":old["title"],"limit":20})
+                assert found.status_code==200,found.text
+                assert any(line["recipe_id"]==rid for line in found.json()["data"]["items"])
+                conflict=client.post(f"/api/admin/recipes/{rid}/restore",json={
+                    "snapshot_id":snapshots[rid],"expected_version":"0"*64},headers=headers)
+                assert conflict.status_code==409,conflict.text
+
+            # Recipe 4 originally marks garlic optional; ordinary Admin edits
+            # normalize new lines, but recovery must restore that exact flag.
+            recipe_four=client.get("/api/recipes/4").json()["data"]
+            assert any(line["id"]==7 and not line["is_required"] for line in recipe_four["ingredients"])
+            restored_meal_v1=client.post("/api/meal-plan",json={})
+            restored_meal_v2=client.post("/api/meal-plan/v2",json={"people":4})
+            assert restored_meal_v1.status_code==200 and restored_meal_v1.json()["data"]["plan"] is not None
+            assert restored_meal_v2.status_code==200 and restored_meal_v2.json()["data"]["plan"] is not None
+            for algorithm in ("baseline","proposed"):
+                restored_recommend=client.post("/api/recommend",json={"ingredient_ids":[1,26],"algorithm":algorithm,"top_k":20})
+                assert restored_recommend.status_code==200,restored_recommend.text
+            assert sql(connection,"SELECT COUNT(*) AS n FROM v2_recipe_image_overrides WHERE recipe_id IN (7,%s)",(public_v2_recipe_id,))[0]["n"]==2
+
             admin_ids = []
             for offset in (0, 50):
                 admin_list = client.get(f"/api/admin/recipes?limit=50&offset={offset}")
@@ -543,9 +644,9 @@ def test_five_pilot_recipes_round_trip_through_admin_tcp_mysql_and_user(
                 assert admin_ingredients.json()["data"]["total"] == 55
                 ingredient_ids.extend(row["ingredient_id"] for row in admin_ingredients.json()["data"]["items"])
             assert len(ingredient_ids) == 55 and len(ingredient_ids) == len(set(ingredient_ids))
-            assert all(any(row["id"] == new_ids[name] and row["name"] == name
+            assert all(any(row["id"] == V2_OFFSET+iid and row["name"] == name
                            for row in client.get("/api/ingredients", params={"query": name, "limit": 50}).json()["data"]["items"])
-                       for name in new_names)
+                       for iid,name in selected_ingredients.items())
 
             # The structured servings/prep/cook/region/season/occasion fields
             # remain in the dossier only; standard Admin save supports one total
@@ -565,12 +666,12 @@ def test_five_pilot_recipes_round_trip_through_admin_tcp_mysql_and_user(
     assert sql(connection, "SELECT COUNT(*) AS n FROM v2_ingredient_admin_state WHERE is_active=1")[0]["n"] == 5
     assert sql(connection, "SELECT COUNT(*) AS n FROM v2_admin_legacy_recipe_overrides WHERE recipe_id IN (4,5,6,7)")[0]["n"] == 4
     assert sql(connection, "SELECT COUNT(*) AS n FROM v2_admin_legacy_recipe_override_ingredients WHERE recipe_id IN (4,5,6,7)")[0]["n"] == sum(
-        len(recipe["ingredients"]) for recipe in parsed if recipe["kind"] == "legacy ID"
+        len(originals[recipe["recipe_id"]]["ingredients"]) for recipe in parsed if recipe["kind"] == "legacy ID"
     )
     v2_recipe_storage_id = 7980672317 - V2_OFFSET
     assert sql(connection, "SELECT COUNT(*) AS n FROM v2_recipe_revisions WHERE recipe_id=%s", (v2_recipe_storage_id,))[0]["n"] == 1
     assert sql(connection, "SELECT COUNT(*) AS n FROM v2_recipe_ingredient_lines WHERE revision_id=9001")[0]["n"] == next(
-        len(recipe["ingredients"]) for recipe in parsed if recipe["kind"] == "Admin ID hiện tại"
+        len(originals[recipe["recipe_id"]]["ingredients"]) for recipe in parsed if recipe["kind"] == "Admin ID hiện tại"
     )
     assert sql(connection, "SELECT COUNT(*) AS n FROM v2_admin_recipe_catalog_overrides WHERE v2_recipe_id=%s", (v2_recipe_storage_id,))[0]["n"] == 1
     assert fallback_image_catalog.read_bytes() == original_fallback_images

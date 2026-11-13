@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f0e5">
+  <title>{{ page_title }}</title>
+  <link rel="stylesheet" href="/static/styles.css?v=feedback-widget-20261111">
+  <link rel="stylesheet" href="/static/account.css?v=profile-1">
+</head>
+<body class="account-page">
+  {% include "_user_header.html" %}
+  <main class="account-shell account-profile-shell">
+    <section class="account-card" aria-labelledby="account-title" aria-busy="true">
+      <a class="account-back" href="/">← Trở về khám phá</a>
+      <p class="account-kicker">TÀI KHOẢN NGƯỜI DÙNG</p>
+      <h1 id="account-title">Thông tin tài khoản</h1>
+      <p class="account-intro">Thông tin lấy từ phiên User đang đăng nhập.</p>
+      <dl class="profile-fields">
+        <div><dt>Tên đăng nhập</dt><dd id="profile-username">Đang tải…</dd></div>
+        <div><dt>Vai trò</dt><dd id="profile-role">Đang tải…</dd></div>
+        <div><dt>Trạng thái phiên</dt><dd id="profile-status">Đang xác minh…</dd></div>
+      </dl>
+      <p id="profile-message" class="account-message" role="status" aria-live="polite"></p>
+      <div class="profile-actions">
+        <a class="profile-secondary" href="/">Tiếp tục xem món</a>
+        <button id="profile-logout" type="button" disabled>Đăng xuất</button>
+      </div>
+    </section>
+    <footer class="account-footer">Đăng xuất khỏi phiên User hiện tại.</footer>
+  </main>
+  <script src="/static/account-profile.js?v=profile-1" defer></script>
+</body>
+</html>

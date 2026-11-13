@@ -56,6 +56,8 @@ def validate_update(payload,request_id):
 
 def validate_restore(payload,request_id):
     """Validate a checksummed snapshot restore while preserving historical line flags."""
+    if not isinstance(payload,dict) or not isinstance(payload.get("ingredients"),list):
+        _reject(request_id)
     normalized=validate_update({**payload,"ingredients":[
         {**line,"is_required":True} for line in payload.get("ingredients",[])
     ]},request_id)

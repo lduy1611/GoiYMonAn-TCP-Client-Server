@@ -40,6 +40,12 @@ def test_vietnamese_name_validation_normalizes_unicode_and_rejects_controls():
         admin_ingredients.validate_create({"name": "\x00"}, "TEST_ONLY")
 
 
+def test_ingredient_name_rejects_replacement_question_mark_corruption():
+    for name in ("Rau c?i", "Mu?i"):
+        with pytest.raises(Exception):
+            admin_ingredients.validate_create({"name": name}, "TEST_ONLY")
+
+
 def test_admin_ingredient_migration_and_lifecycle_are_additive(mysql_db, monkeypatch):
     connection, config = mysql_db
     sql(connection,"UPDATE ingredients SET name='Ớt đỏ',normalized_name='ớt đỏ' WHERE id=1")
@@ -51,13 +57,14 @@ def test_admin_ingredient_migration_and_lifecycle_are_additive(mysql_db, monkeyp
     sql(connection, """INSERT INTO v2_ingredients
         (id,legacy_ingredient_id,canonical_name,normalized_name,identity_status,evidence_set_id)
         VALUES(50001,1,'Ớt đỏ','ớt đỏ','DRAFT',NULL),(50002,2,'Hành lá','hành lá','NEEDS_VERIFICATION',1),
-              (50004,NULL,'TEST_ONLY reviewed ingredient','test_only reviewed ingredient','NEEDS_VERIFICATION',1)""")
+              (50004,NULL,'TEST_ONLY reviewed ingredient','test_only reviewed ingredient','NEEDS_VERIFICATION',1),
+              (50005,NULL,'TEST_ONLY editable unverified','test_only editable unverified','NEEDS_VERIFICATION',NULL)""")
     applied = migrate_v2.run_admin_ingredient_migration(connection, "apply")
     assert applied["admin_ingredient_state"] == "APPLIED"
     assert applied["context_state"] == "NOT_APPLIED"
     assert sql(connection, "SELECT ingredient_id,is_active FROM v2_ingredient_admin_state ORDER BY ingredient_id") == [
         {"ingredient_id":50001,"is_active":1},{"ingredient_id":50002,"is_active":1},
-        {"ingredient_id":50004,"is_active":1}]
+        {"ingredient_id":50004,"is_active":1},{"ingredient_id":50005,"is_active":1}]
 
     repository = MySQLRepository(config, pool_size=1)
     def test_writer():
@@ -85,6 +92,11 @@ def test_admin_ingredient_migration_and_lifecycle_are_additive(mysql_db, monkeyp
     with pytest.raises(AdminIngredientConflict, match="evidence"):
         repository.admin_update_ingredient(admin_ingredients.validate_update(
             {"ingredient_id":V2_OFFSET+50004,"name":"Hành hoa"}, "TEST_ONLY"))
+    unverified = repository.admin_list_ingredients(connection,"editable unverified",limit=10,catalog="v2")
+    assert unverified["total"] == 1
+    assert unverified["items"][0]["ingredient_id"] == V2_OFFSET+50005
+    assert unverified["items"][0]["identity_status"] == "NEEDS_VERIFICATION"
+    assert unverified["items"][0]["can_edit"] is True
 
     repository.admin_set_ingredient_active({"ingredient_id":created["ingredient_id"],"is_active":False})
     inactive = repository.admin_list_ingredients(connection, "cai thia", limit=10, catalog="v2")
@@ -100,6 +112,13 @@ def test_admin_ingredient_migration_and_lifecycle_are_additive(mysql_db, monkeyp
 
 def test_admin_ingredient_tcp_validation_contract():
     assert admin_ingredients.validate_list({"query":"hành","limit":20,"offset":20,"active_only":True},"TEST_ONLY")["offset"] == 20
+    assert admin_ingredients.validate_list({"status":"all"},"TEST_ONLY")["status"] == "all"
+    assert admin_ingredients.validate_list({"status":"active"},"TEST_ONLY")["status"] == "active"
+    assert admin_ingredients.validate_list({"status":"inactive"},"TEST_ONLY")["status"] == "inactive"
+    with pytest.raises(Exception):
+        admin_ingredients.validate_list({"status":"unknown"},"TEST_ONLY")
+    with pytest.raises(Exception):
+        admin_ingredients.validate_list({"status":"inactive","active_only":True},"TEST_ONLY")
     for payload in ({"name":""},{"name":"hành","is_active":True},{"name":"\n"}):
         with pytest.raises(Exception):
             admin_ingredients.validate_create(payload,"TEST_ONLY")
@@ -116,6 +135,8 @@ def test_writer_allowlist_accepts_existing_recipe_overlay_and_only_new_ingredien
         "GRANT SELECT, INSERT (ingredient_id, name_override, normalized_name, is_active, updated_by), UPDATE (name_override, normalized_name, is_active, updated_by) ON goiy_mon_an.v2_admin_legacy_ingredient_overrides TO 'goiy_admin_writer'@'localhost'",
     ])
     validate_writer_grants(grants,ingredient_admin=True,legacy_ingredient_admin=True)
+    validate_writer_grants(grants+["GRANT UPDATE (identity_status) ON goiy_mon_an.v2_ingredients TO 'goiy_admin_writer'@'localhost'"],
+                           ingredient_admin=True,legacy_ingredient_admin=True)
     with pytest.raises(RuntimeError,match="unapproved grant"):
         validate_writer_grants(grants+["GRANT ALL PRIVILEGES ON goiy_mon_an.ingredients TO 'goiy_admin_writer'@'localhost'"],
                                legacy_ingredient_admin=True)
@@ -125,10 +146,22 @@ def test_admin_ingredient_api_to_tcp_to_test_mysql(mysql_db, monkeypatch, tmp_pa
     connection, config = mysql_db
     _install_001_and_003(connection)
     migrate_v2.run_admin_ingredient_migration(connection,"apply")
-    # Historical, unverified English-only imports stay in storage but must not
-    # leak into either side of the shared public/Admin catalog.
-    sql(connection,"INSERT INTO v2_ingredients(id,canonical_name,normalized_name,identity_status) "
-        "VALUES(50001,'black pepper','black pepper','NEEDS_VERIFICATION')")
+    # Historical imports remain hidden until each chosen identity is explicitly
+    # renamed and made available by the Admin update API.
+    from source.common.catalog_ids import V2_OFFSET
+    sql(connection,"INSERT INTO ingredients VALUES(3,'H\u00e0nh','h\u00e0nh')")
+    selected={891047879:"D\u1ea7u \u0103n",2865256237:"Mu\u1ed1i",3731415834:"\u0110\u01b0\u1eddng",
+              2056836464:"Ti\u00eau \u0111en",3331361648:"H\u00e0nh t\u00edm"}
+    for iid,name in selected.items():
+        sql(connection,"INSERT INTO v2_ingredients(id,canonical_name,normalized_name,identity_status) "
+            "VALUES(%s,%s,%s,'NEEDS_VERIFICATION')",(iid,"TEST_ONLY imported "+str(iid),"test_only imported "+str(iid)))
+        # Existing active rows reproduce the production no-op upsert case.
+        sql(connection,"INSERT INTO v2_ingredient_admin_state(ingredient_id,is_active) VALUES(%s,1)",(iid,))
+    other_ids=list(range(100001,100037))
+    for iid in other_ids:
+        name=f"TEST_ONLY unselected import {iid}"
+        sql(connection,"INSERT INTO v2_ingredients(id,canonical_name,normalized_name,identity_status) "
+            "VALUES(%s,%s,%s,'NEEDS_VERIFICATION')",(iid,name,name.casefold()))
     repository=MySQLRepository(config,pool_size=1)
     monkeypatch.setattr(repository,"_admin_writer",lambda:mysql.connector.connect(**{**config,"autocommit":False}))
     monkeypatch.setattr(repository,"admin_ingredient_writer_ready",lambda:True)
@@ -163,8 +196,26 @@ def test_admin_ingredient_api_to_tcp_to_test_mysql(mysql_db, monkeypatch, tmp_pa
             admin_items=admin_catalog.json()["data"]["items"]
             assert [(item["id"],item["name"]) for item in user_items]==[
                 (item["ingredient_id"],item["name"]) for item in admin_items]
-            assert len({item["ingredient_id"] for item in admin_items})==len(admin_items)==2
-            assert not any(item["name"]=="black pepper" for item in user_items+admin_items)
+            assert len({item["ingredient_id"] for item in admin_items})==len(admin_items)==3
+            assert not any(item["name"].startswith("TEST_ONLY imported") for item in user_items+admin_items)
+            for iid,name in selected.items():
+                response=client.patch(f"/api/admin/ingredients/{V2_OFFSET+iid}",
+                    json={"name":name,"make_available":True},headers=headers)
+                assert response.status_code==200,response.text
+                assert response.json()["data"]["identity_status"]=="DRAFT"
+                repeated=client.patch(f"/api/admin/ingredients/{V2_OFFSET+iid}",
+                    json={"name":name,"make_available":True},headers=headers)
+                assert repeated.status_code==200,repeated.text
+            user_localized=client.get("/api/ingredients?limit=50")
+            admin_localized=client.get("/api/admin/ingredients?catalog=shared&limit=50")
+            user_pairs=[(item["id"],item["name"]) for item in user_localized.json()["data"]["items"]]
+            admin_pairs=[(item["ingredient_id"],item["name"]) for item in admin_localized.json()["data"]["items"]]
+            assert user_pairs==admin_pairs
+            assert all((V2_OFFSET+iid,name) in user_pairs for iid,name in selected.items())
+            assert (3,"H\u00e0nh") in user_pairs and (V2_OFFSET+3331361648,"H\u00e0nh t\u00edm") in user_pairs
+            assert len({item["ingredient_id"] for item in admin_localized.json()["data"]["items"]})==len(user_pairs)==8
+            assert not any(item["id"]>V2_OFFSET and item["id"]-V2_OFFSET in other_ids for item in user_localized.json()["data"]["items"])
+            assert sql(connection,"SELECT COUNT(*) n FROM v2_ingredients WHERE identity_status='NEEDS_VERIFICATION' AND id IN (%s)" % ",".join(["%s"]*len(other_ids)),tuple(other_ids))[0]["n"]==len(other_ids)
             created=client.post("/api/admin/ingredients",json={"name":"  B\u00e1nh   m\u00ec "},headers=headers)
             assert created.status_code==200,created.text
             ingredient=created.json()["data"]
@@ -233,7 +284,9 @@ def test_legacy_and_v2_ingredient_union_overlay_and_utf8_pipeline(mysql_db, monk
     assert repository.admin_list_ingredients(connection,"black",limit=10,catalog="shared")["total"]==0
     v2_only=repository.admin_list_ingredients(connection,"black",limit=10,catalog="v2")
     from source.common.catalog_ids import V2_OFFSET
-    assert v2_only["total"]==0
+    assert v2_only["total"]==1
+    assert v2_only["items"][0]["ingredient_id"]==V2_OFFSET+50003
+    assert v2_only["items"][0]["identity_status"]=="NEEDS_VERIFICATION"
     assert user_repository.ingredient_ids_exist(connection,{V2_OFFSET+50003}) is False
     assert repository.ingredient_ids_exist(connection,{50003}) is False
 
@@ -282,6 +335,19 @@ def test_shared_catalog_uses_one_stable_id_for_linked_or_exact_legacy_identity()
         (2,"Hành lá",7),(V2_OFFSET+93,"Nấm TEST_ONLY",0)]
 
 
+def test_test_only_v2_localized_display_keeps_shallot_separate_from_legacy_hanh():
+    """A Vietnamese display label must not infer a synonym or change either ID."""
+    from source.common.catalog_ids import V2_OFFSET
+    from source.server.ingredient_catalog import merge_catalog
+    legacy=[{"id":3,"name":"H\u00e0nh","normalized_name":"h\u00e0nh","is_active":True,
+             "usage_count":1,"can_edit":True,"can_manage":True,"aliases":[]}]
+    v2=[{"id":3331361648,"legacy_ingredient_id":None,"name":"H\u00e0nh t\u00edm",
+         "normalized_name":"h\u00e0nh t\u00edm","is_active":True,"usage_count":1}]
+    rows=merge_catalog(legacy,v2,active_only=True)
+    assert [(row["ingredient_id"],row["name"]) for row in rows]==[
+        (3,"H\u00e0nh"),(V2_OFFSET+3331361648,"H\u00e0nh t\u00edm")]
+
+
 def test_legacy_ingredient_gateway_routes_keep_admin_csrf(monkeypatch):
     from source.web.main import app
     monkeypatch.setenv("ADMIN_USERNAME","TEST_ONLY_ADMIN")
@@ -301,3 +367,137 @@ def test_legacy_ingredient_gateway_routes_keep_admin_csrf(monkeypatch):
         assert client.patch("/api/admin/legacy-ingredients/2",json={"name":"Hành hoa"},headers={"X-CSRF-Token":csrf}).status_code==200
         assert client.patch("/api/admin/legacy-ingredients/2/active",json={"is_active":False},headers={"X-CSRF-Token":csrf}).status_code==200
     assert [operation for operation,_ in calls]==["ADMIN_UPDATE_LEGACY_INGREDIENT","ADMIN_SET_LEGACY_INGREDIENT_ACTIVE"]
+
+
+def test_v2_ingredient_update_conflicts_race_and_atomic_rollback(mysql_db, monkeypatch):
+    """No-op writes, real conflicts and concurrent updates are checked by row identity."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from source.common.catalog_ids import V2_OFFSET
+
+    connection,config=mysql_db
+    _install_001_and_003(connection)
+    migrate_v2.run_admin_ingredient_migration(connection,"apply")
+    sql(connection,"INSERT INTO v2_ingredients(id,canonical_name,normalized_name,identity_status) VALUES"
+        "(60001,'TEST_ONLY seed one','test_only seed one','NEEDS_VERIFICATION'),"
+        "(60002,'TEST_ONLY seed two','test_only seed two','NEEDS_VERIFICATION'),"
+        "(60003,'TEST_ONLY rollback seed','test_only rollback seed','NEEDS_VERIFICATION')")
+    sql(connection,"INSERT INTO v2_ingredient_admin_state(ingredient_id,is_active) VALUES(60001,1),(60002,1),(60003,0)")
+    repository=MySQLRepository(config,pool_size=1)
+    monkeypatch.setattr(repository,"_admin_writer",lambda:mysql.connector.connect(**{**config,"autocommit":False}))
+    monkeypatch.setattr(repository,"admin_ingredient_writer_ready",lambda:True)
+
+    def update_payload(iid,name,available=True):
+        return admin_ingredients.validate_update({"ingredient_id":V2_OFFSET+iid,"name":name,
+            "make_available":available},"TEST_ONLY")
+
+    result=repository.admin_update_ingredient(update_payload(60001,"TEST_ONLY renamed one"))
+    assert result["name"]=="TEST_ONLY renamed one"
+    assert sql(connection,"SELECT canonical_name,identity_status FROM v2_ingredients WHERE id=60001")[0]=={
+        "canonical_name":"TEST_ONLY renamed one","identity_status":"DRAFT"}
+    assert sql(connection,"SELECT is_active FROM v2_ingredient_admin_state WHERE ingredient_id=60001")[0]["is_active"]==1
+    assert repository.admin_update_ingredient(update_payload(60001,"TEST_ONLY renamed one"))["name"]=="TEST_ONLY renamed one"
+
+    with pytest.raises(AdminIngredientConflict,match="not found"):
+        repository.admin_update_ingredient(update_payload(60999,"TEST_ONLY nonexistent"))
+    with pytest.raises(AdminIngredientConflict,match="normalized name"):
+        repository.admin_update_ingredient(update_payload(60001,"TEST_ONLY seed two"))
+    assert sql(connection,"SELECT canonical_name FROM v2_ingredients WHERE id=60001")[0]["canonical_name"]=="TEST_ONLY renamed one"
+
+    barrier=Barrier(2)
+    def concurrent_update(name):
+        barrier.wait(timeout=5)
+        return repository.admin_update_ingredient(update_payload(60001,name))["name"]
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results=list(executor.map(concurrent_update,["TEST_ONLY race alpha","TEST_ONLY race beta"]))
+    final=sql(connection,"SELECT canonical_name,normalized_name FROM v2_ingredients WHERE id=60001")[0]
+    assert final["canonical_name"] in results
+    assert final["normalized_name"]==final["canonical_name"].casefold()
+    assert sql(connection,"SELECT COUNT(*) n FROM v2_ingredients WHERE normalized_name=%s",
+        (final["normalized_name"],))[0]["n"]==1
+
+    # Inject a failure after updating the identity and activation row, before
+    # post-write verification. Both changes must roll back together.
+    original_fetchone=repository._fetchone
+    def fail_after_upsert(conn,query,params=()):
+        if "FROM v2_ingredient_admin_state WHERE ingredient_id=%s FOR UPDATE" in query:
+            raise RuntimeError("TEST_ONLY injected failure after activation upsert")
+        return original_fetchone(conn,query,params)
+    monkeypatch.setattr(repository,"_fetchone",fail_after_upsert)
+    with pytest.raises(RuntimeError,match="TEST_ONLY injected failure"):
+        repository.admin_update_ingredient(update_payload(60003,"TEST_ONLY must rollback"))
+    monkeypatch.setattr(repository,"_fetchone",original_fetchone)
+    assert sql(connection,"SELECT canonical_name,identity_status FROM v2_ingredients WHERE id=60003")[0]=={
+        "canonical_name":"TEST_ONLY rollback seed","identity_status":"NEEDS_VERIFICATION"}
+    assert sql(connection,"SELECT is_active FROM v2_ingredient_admin_state WHERE ingredient_id=60003")[0]["is_active"]==0
+
+    user_rows=repository.list_ingredients(connection,"race",50)
+    admin_rows=repository.admin_list_ingredients(connection,"race",limit=50,catalog="shared")["items"]
+    assert [(row["id"],row["name"]) for row in user_rows]==[
+        (row["ingredient_id"],row["name"]) for row in admin_rows]
+
+
+def test_public_and_admin_ingredient_catalogs_50_to_55_projection_and_pagination(mysql_db, monkeypatch):
+    """Only the five explicitly enabled TEST_ONLY IDs join the 50-item catalog."""
+    from source.common.catalog_ids import V2_OFFSET
+
+    connection,config=mysql_db
+    # Expand the private fixture to the protected 50/50/252 legacy baseline.
+    for iid in range(3,51):
+        sql(connection,"INSERT INTO ingredients VALUES(%s,%s,%s)",
+            (iid,f"TEST_ONLY legacy ingredient {iid}",f"test_only legacy ingredient {iid}"))
+        sql(connection,"INSERT INTO recipes VALUES(%s,%s,%s,10,NULL,%s)",
+            (iid,f"TEST_ONLY legacy recipe {iid}","TEST_ONLY instructions",f"TEST_ONLY {iid}"))
+    added=0
+    for recipe_id in range(1,51):
+        for ingredient_id in range(1,51):
+            if (recipe_id,ingredient_id) in ((1,1),(2,2)):
+                continue
+            sql(connection,"INSERT INTO recipe_ingredients VALUES(%s,%s,%s,1)",
+                (recipe_id,ingredient_id,"TEST_ONLY relation"))
+            added+=1
+            if added==250:break
+        if added==250:break
+    assert added==250
+    legacy_before=legacy_hashes(connection)
+    assert sql(connection,"SELECT COUNT(*) n FROM recipes")[0]["n"]==50
+    assert sql(connection,"SELECT COUNT(*) n FROM ingredients")[0]["n"]==50
+    assert sql(connection,"SELECT COUNT(*) n FROM recipe_ingredients")[0]["n"]==252
+
+    _install_001_and_003(connection)
+    migrate_v2.run_admin_ingredient_migration(connection,"apply")
+    selected={891047879:"Dầu ăn",2865256237:"Muối",3731415834:"Đường",
+              2056836464:"Tiêu đen",3331361648:"Hành tím"}
+    other_ids=list(range(100001,100037))
+    for iid in (*selected.keys(),*other_ids):
+        name=f"TEST_ONLY import {iid}"
+        sql(connection,"INSERT INTO v2_ingredients(id,canonical_name,normalized_name,identity_status) "
+            "VALUES(%s,%s,%s,'NEEDS_VERIFICATION')",(iid,name,name.casefold()))
+        sql(connection,"INSERT INTO v2_ingredient_admin_state(ingredient_id,is_active) VALUES(%s,1)",(iid,))
+
+    repository=MySQLRepository(config,pool_size=1)
+    monkeypatch.setattr(repository,"_admin_writer",lambda:mysql.connector.connect(**{**config,"autocommit":False}))
+    monkeypatch.setattr(repository,"admin_ingredient_writer_ready",lambda:True)
+    user_view=repository.request_view(connection,"LIST_INGREDIENTS")
+    user_before=user_view.list_ingredients(connection,"",100)
+    assert len(user_before)==50 and all(row["id"]<=V2_OFFSET for row in user_before)
+    first=repository.admin_list_ingredients(connection,"",limit=20,offset=0,catalog="shared")
+    second=repository.admin_list_ingredients(connection,"",limit=20,offset=20,catalog="shared")
+    third=repository.admin_list_ingredients(connection,"",limit=20,offset=40,catalog="shared")
+    assert [first["total"],second["total"],third["total"]]==[50,50,50]
+    assert [len(first["items"]),len(second["items"]),len(third["items"])]==[20,20,10]
+
+    for iid,name in selected.items():
+        repository.admin_update_ingredient(admin_ingredients.validate_update(
+            {"ingredient_id":V2_OFFSET+iid,"name":name,"make_available":True},"TEST_ONLY"))
+    user_after=user_view.list_ingredients(connection,"",100)
+    admin_after=repository.admin_list_ingredients(connection,"",limit=100,offset=0,catalog="shared")
+    user_pairs=[(row["id"],row["name"]) for row in user_after]
+    admin_pairs=[(row["ingredient_id"],row["name"]) for row in admin_after["items"]]
+    assert len(user_after)==admin_after["total"]==55
+    assert sorted(user_pairs)==sorted(admin_pairs)
+    assert all((V2_OFFSET+iid,name) in user_pairs for iid,name in selected.items())
+    assert not any(row["id"]>V2_OFFSET and row["id"]-V2_OFFSET in other_ids for row in user_after)
+    assert sql(connection,"SELECT COUNT(*) n FROM v2_ingredients WHERE id IN (%s) AND identity_status='NEEDS_VERIFICATION'" %
+        ",".join(["%s"]*len(other_ids)),tuple(other_ids))[0]["n"]==36
+    assert legacy_hashes(connection)==legacy_before

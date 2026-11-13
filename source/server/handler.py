@@ -22,6 +22,15 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
         if claims is None:
             raise ProtocolError("ADMIN_UNAUTHORIZED", "administrator authentication is required", request_id)
         payload = {key:value for key,value in payload.items() if key != "admin_token"}
+        # The unified v3 catalog publishes valid Admin saves directly. Prevent
+        # legacy revision/review endpoints from falling through to inherited
+        # v2 repository methods and touching tables outside the selected schema.
+        if getattr(repository, "unified_catalog_mode", False) and op in {
+            "ADMIN_CREATE_DRAFT", "ADMIN_UPDATE_DRAFT", "ADMIN_SUBMIT_REVIEW",
+            "ADMIN_REVIEW_SOURCE", "ADMIN_APPROVE_RECIPE", "ADMIN_REJECT_RECIPE",
+            "ADMIN_PUBLISH_RELEASE", "ADMIN_UNPUBLISH_RECIPE", "ADMIN_RESTORE_RECIPE_SNAPSHOT",
+        }:
+            raise ProtocolError("UNSUPPORTED_OPERATION", "v3 Admin saves directly to the unified catalog", request_id)
         if "account_uid" in claims:
             from source.server.repository import UserAccountUnauthorized, UserAccountUnavailable
             try:
@@ -49,16 +58,280 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
         except UserAccountUnavailable:
             raise ProtocolError("USER_ACCOUNT_UNAVAILABLE", "user account migration or writer is unavailable", request_id)
         return success_response(request_id, result), op
+    achievement_user = None
+    if op in {"ACHIEVEMENT_CREATE", "ACHIEVEMENT_CREATE_STATUS", "ACHIEVEMENT_COMMENT_CREATE", "ACHIEVEMENT_POST_DELETE", "ACHIEVEMENT_COMMENT_DELETE"}:
+        from source.common.user_tokens import verify as verify_user_token
+        from source.server import achievements
+        from source.server.repository import UserAccountUnauthorized
+        token = payload.get("session_token")
+        achievement_user = verify_user_token(token)
+        if achievement_user is None:
+            raise ProtocolError("USER_UNAUTHORIZED", "a signed-in account is required", request_id)
+        try:
+            account = repository.user_session({"uid": achievement_user["uid"], "sub": achievement_user["sub"],
+                "role": achievement_user["role"], "csrf": achievement_user["csrf"]})
+        except (UserAccountUnauthorized, Exception) as exc:
+            # Do not turn database outages into an authorization bypass.
+            if isinstance(exc, UserAccountUnauthorized):
+                raise ProtocolError("USER_UNAUTHORIZED", "account is locked or unavailable", request_id)
+            raise
+        payload = {key: value for key, value in payload.items() if key != "session_token"}
+        if op == "ACHIEVEMENT_CREATE":
+            payload = achievements.validate_post({**payload, "user_id": int(account["user_id"])})
+        elif op == "ACHIEVEMENT_CREATE_STATUS":
+            key = payload.get("request_key")
+            try:
+                import uuid
+                uuid.UUID(key)
+            except (ValueError, TypeError, AttributeError):
+                raise ProtocolError("INVALID_PAYLOAD", "invalid achievement request key", request_id) from None
+            payload = {"request_key": key, "user_id": int(account["user_id"])}
+        elif op == "ACHIEVEMENT_COMMENT_CREATE":
+            payload = achievements.validate_comment({**payload, "user_id": int(account["user_id"])})
+        elif op == "ACHIEVEMENT_POST_DELETE":
+            payload = achievements.validate_owned_delete({**payload, "user_id": int(account["user_id"])})
+        else:
+            payload = achievements.validate_owned_delete({**payload, "user_id": int(account["user_id"])}, comment=True)
+    if op == "FEEDBACK_CREATE":
+        from source.server import feedback
+        user_token = payload.get("session_token")
+        feedback_user_id = None
+        if user_token is not None:
+            from source.common.user_tokens import verify as verify_user_token
+            from source.server.repository import UserAccountUnauthorized
+            user_claims = verify_user_token(user_token)
+            if user_claims is None:
+                raise ProtocolError("USER_UNAUTHORIZED", "the signed-in session is invalid", request_id)
+            try:
+                account = repository.user_session({"uid": user_claims["uid"], "sub": user_claims["sub"],
+                    "role": user_claims["role"], "csrf": user_claims["csrf"]})
+            except UserAccountUnauthorized:
+                raise ProtocolError("USER_UNAUTHORIZED", "the signed-in account is locked or unavailable", request_id)
+            feedback_user_id = int(account["user_id"])
+        submitted = {key: value for key, value in payload.items() if key != "session_token"}
+        if feedback_user_id is not None:
+            submitted["user_id"] = feedback_user_id
+        try:
+            validated_feedback = feedback.validate_create(submitted)
+        except ValueError as exc:
+            raise ProtocolError("INVALID_PAYLOAD", str(exc), request_id) from None
+        result = repository.feedback_create(validated_feedback)
+        version_connection = repository.connect()
+        try:
+            version = repository.dataset_version(version_connection)
+        finally:
+            version_connection.close()
+        return success_response(request_id, {"dataset_version": version, **result}), op
     connection = repository.connect()
     try:
         view = getattr(repository, "request_view", None)
         if view is not None:
             repository = view(connection, op)
         version = repository.dataset_version(connection)
+        if op == "ADMIN_FEEDBACK_LIST":
+            from source.server.feedback import validate_admin_list
+            try:
+                status, limit, offset = validate_admin_list(payload)
+            except ValueError as exc:
+                raise ProtocolError("INVALID_PAYLOAD", str(exc), request_id) from None
+            result = repository.feedback_admin_list(connection, status, limit, offset)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_GET":
+            feedback_id = payload.get("feedback_id")
+            if set(payload) != {"feedback_id"} or type(feedback_id) is not int or feedback_id < 1:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback ID", request_id)
+            result = repository.feedback_admin_get(connection, feedback_id)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_IMAGE_GET":
+            key = payload.get("storage_key")
+            if set(payload) != {"storage_key"} or not isinstance(key, str) or len(key) != 36:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback image key", request_id)
+            result = repository.feedback_admin_image(connection, key)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback image not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_SET_STATUS":
+            feedback_id, status = payload.get("feedback_id"), payload.get("status")
+            if set(payload) != {"feedback_id", "status"} or type(feedback_id) is not int or feedback_id < 1 or not isinstance(status, str) or status not in {"open", "resolved"}:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback status update", request_id)
+            result = repository.feedback_admin_set_status(feedback_id, status)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_DELETE":
+            feedback_id = payload.get("feedback_id")
+            if set(payload) != {"feedback_id"} or type(feedback_id) is not int or feedback_id < 1:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback ID", request_id)
+            result = repository.feedback_admin_delete(feedback_id)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ACHIEVEMENT_LIST" or op == "ADMIN_ACHIEVEMENT_LIST":
+            from source.server.achievements import validate_list
+            query, limit, offset = validate_list(payload)
+            if op.startswith("ADMIN_") and not getattr(repository, "unified_catalog_mode", False):
+                raise ProtocolError("UNSUPPORTED_OPERATION", "achievements are available only in unified schema v3", request_id)
+            data = repository.achievement_list(connection, query, limit, offset, admin=op.startswith("ADMIN_"))
+            return success_response(request_id, {"dataset_version": version, **data}), op
+        if op in {"ACHIEVEMENT_GET", "ADMIN_ACHIEVEMENT_GET"}:
+            admin = op.startswith("ADMIN_")
+            post_id = payload.get("post_id")
+            if set(payload) != {"post_id"} or type(post_id) is not int or not 1 <= post_id < 2**64:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid achievement ID", request_id)
+            result = repository.achievement_get(connection, post_id, admin=admin)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "achievement not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ACHIEVEMENT_CREATE_STATUS":
+            key = payload.get("request_key")
+            if set(payload) != {"request_key", "user_id"} or not isinstance(key, str) or type(payload.get("user_id")) is not int:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid achievement request status query", request_id)
+            result = repository.achievement_create_result(connection, payload["user_id"], key)
+            return success_response(request_id, {"dataset_version": version, "achievement": result}), op
+        if op == "ACHIEVEMENT_IMAGE_GET":
+            key = payload.get("storage_key")
+            if set(payload) != {"storage_key"} or not isinstance(key, str) or len(key) > 100:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid achievement image key", request_id)
+            result = repository.achievement_image(connection, key)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "achievement image not found", request_id)
+            return success_response(request_id, result), op
+        if op == "ADMIN_ACHIEVEMENT_IMAGE_GET":
+            key = payload.get("storage_key")
+            if set(payload) != {"storage_key"} or not isinstance(key, str) or len(key) > 100:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid achievement image key", request_id)
+            result = repository.achievement_image(connection, key, admin=True)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "achievement image not found", request_id)
+            return success_response(request_id, result), op
+        if op == "ACHIEVEMENT_CREATE":
+            try:
+                result = repository.achievement_create(payload)
+            except ValueError as exc:
+                message = str(exc)
+                code = "NOT_FOUND" if "unavailable" in message else "ACHIEVEMENT_CONFLICT"
+                raise ProtocolError(code, message, request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ACHIEVEMENT_COMMENT_CREATE":
+            try:
+                result = repository.achievement_comment_create(payload)
+            except ValueError as exc:
+                raise ProtocolError("NOT_FOUND", str(exc), request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op in {"ACHIEVEMENT_POST_DELETE", "ADMIN_ACHIEVEMENT_POST_DELETE"}:
+            admin = op.startswith("ADMIN_")
+            allowed = {"post_id"} if admin else {"post_id", "user_id"}
+            if set(payload) != allowed or type(payload.get("post_id")) is not int or not 1 <= payload["post_id"] < 2**64:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid achievement delete request", request_id)
+            try:
+                result = repository.achievement_delete_post(payload["post_id"], user_id=None if admin else payload["user_id"])
+            except LookupError as exc:
+                raise ProtocolError("NOT_FOUND", str(exc), request_id)
+            except PermissionError as exc:
+                raise ProtocolError("FORBIDDEN", str(exc), request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op in {"ACHIEVEMENT_COMMENT_DELETE", "ADMIN_ACHIEVEMENT_COMMENT_DELETE"}:
+            admin = op.startswith("ADMIN_")
+            allowed = {"comment_id"} if admin else {"comment_id", "user_id"}
+            if set(payload) != allowed or type(payload.get("comment_id")) is not int or not 1 <= payload["comment_id"] < 2**64:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid comment delete request", request_id)
+            try:
+                result = repository.achievement_delete_comment(payload["comment_id"], user_id=None if admin else payload["user_id"])
+            except LookupError as exc:
+                raise ProtocolError("NOT_FOUND", str(exc), request_id)
+            except PermissionError as exc:
+                raise ProtocolError("FORBIDDEN", str(exc), request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_LIST":
+            from source.server.feedback import validate_admin_list
+            try:
+                status, limit, offset = validate_admin_list(payload)
+            except ValueError as exc:
+                raise ProtocolError("INVALID_PAYLOAD", str(exc), request_id) from None
+            result = repository.feedback_admin_list(connection, status, limit, offset)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_GET":
+            feedback_id = payload.get("feedback_id")
+            if set(payload) != {"feedback_id"} or type(feedback_id) is not int or feedback_id < 1:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback ID", request_id)
+            result = repository.feedback_admin_get(connection, feedback_id)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_IMAGE_GET":
+            key = payload.get("storage_key")
+            if set(payload) != {"storage_key"} or not isinstance(key, str) or len(key) != 36:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback image key", request_id)
+            result = repository.feedback_admin_image(connection, key)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback image not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_SET_STATUS":
+            feedback_id, status = payload.get("feedback_id"), payload.get("status")
+            if set(payload) != {"feedback_id", "status"} or type(feedback_id) is not int or feedback_id < 1 or status not in {"open", "resolved"}:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback status update", request_id)
+            result = repository.feedback_admin_set_status(feedback_id, status)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
+        if op == "ADMIN_FEEDBACK_DELETE":
+            feedback_id = payload.get("feedback_id")
+            if set(payload) != {"feedback_id"} or type(feedback_id) is not int or feedback_id < 1:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid feedback ID", request_id)
+            result = repository.feedback_admin_delete(feedback_id)
+            if result is None:
+                raise ProtocolError("NOT_FOUND", "feedback not found", request_id)
+            return success_response(request_id, {"dataset_version": version, **result}), op
         if op == "ADMIN_DASHBOARD":
             if payload:
                 raise ProtocolError("INVALID_PAYLOAD", "invalid administrator dashboard request", request_id)
             return success_response(request_id, {"dataset_version":version, **repository.admin_dashboard(connection)}), op
+        if op in {"ADMIN_LIST_TAXONOMIES", "ADMIN_SAVE_TAXONOMY", "ADMIN_SET_TAXONOMY_DELETED",
+                  "ADMIN_DELETE_TAXONOMY_PERMANENT", "ADMIN_GET_RECIPE_TAXONOMIES", "ADMIN_SET_RECIPE_TAXONOMIES"}:
+            if not getattr(repository, "unified_catalog_mode", False):
+                raise ProtocolError("UNSUPPORTED_OPERATION", "Admin taxonomy management requires the unified catalog schema", request_id)
+            from source.server import admin_taxonomies
+            from source.server.repository import AdminTaxonomyConflict, AdminWriteUnavailable
+            import mysql.connector
+            try:
+                if op == "ADMIN_LIST_TAXONOMIES":
+                    data = admin_taxonomies.validate_list(payload, request_id)
+                    result = repository.admin_list_taxonomies(connection, data)
+                elif op == "ADMIN_SAVE_TAXONOMY":
+                    data = admin_taxonomies.validate_save(payload, request_id)
+                    result = repository.admin_save_taxonomy(connection, data)
+                elif op == "ADMIN_SET_TAXONOMY_DELETED":
+                    data = admin_taxonomies.validate_deleted(payload, request_id)
+                    result = repository.admin_set_taxonomy_deleted(connection, data)
+                elif op == "ADMIN_DELETE_TAXONOMY_PERMANENT":
+                    data = admin_taxonomies.validate_delete(payload, request_id)
+                    result = repository.admin_delete_taxonomy_permanent(connection, data["tag_id"])
+                elif op == "ADMIN_GET_RECIPE_TAXONOMIES":
+                    if (set(payload) != {"recipe_id", "kind"} or type(payload.get("recipe_id")) is not int
+                            or payload["recipe_id"] < 1 or not isinstance(payload.get("kind"), str)
+                            or payload["kind"] not in admin_taxonomies.GROUPS):
+                        raise ProtocolError("INVALID_PAYLOAD", "invalid recipe taxonomy query", request_id)
+                    result = repository.admin_get_recipe_taxonomies(connection, payload["recipe_id"], payload["kind"])
+                    if result is None:
+                        raise ProtocolError("NOT_FOUND", "recipe not found", request_id)
+                else:
+                    data = admin_taxonomies.validate_recipe_tags(payload, request_id)
+                    result = repository.admin_set_recipe_taxonomies(connection, data)
+            except ProtocolError:
+                raise
+            except AdminTaxonomyConflict as exc:
+                raise ProtocolError("ADMIN_TAXONOMY_CONFLICT", str(exc), request_id) from None
+            except AdminWriteUnavailable:
+                raise ProtocolError("ADMIN_WRITE_UNAVAILABLE", "taxonomy database writer is unavailable", request_id)
+            except mysql.connector.Error as exc:
+                if exc.errno in (1062, 1451, 1452):
+                    raise ProtocolError("ADMIN_TAXONOMY_CONFLICT", "taxonomy code or recipe link conflicts with existing data", request_id) from None
+                if exc.errno in (1044, 1045, 1142, 1227):
+                    raise ProtocolError("ADMIN_WRITE_DENIED", "Admin writer lacks taxonomy privileges", request_id) from None
+                raise
+            return success_response(request_id, {"dataset_version":version, **result}), op
         if op == "ADMIN_LIST_RECIPES":
             query=payload.get("query","")
             limit=payload.get("limit",20)
@@ -66,15 +339,22 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
             role=payload.get("role")
             visibility=payload.get("visibility")
             max_minutes=payload.get("max_minutes")
-            if (set(payload)-{"query","limit","offset","role","visibility","max_minutes"} or not isinstance(query,str) or len(query)>80
+            if (set(payload)-{"query","limit","offset","role","visibility","max_minutes","portion_filter"} or not isinstance(query,str) or len(query)>80
                     or type(limit) is not int or not 1<=limit<=50 or type(offset) is not int or not 0<=offset<=10000):
                 raise ProtocolError("INVALID_PAYLOAD", "invalid administrator recipe query", request_id)
-            if (role is not None and role not in {"main","vegetable","soup"}
+            unified = bool(getattr(repository, "unified_catalog_mode", False))
+            allowed_roles = {"main","vegetable","soup","side","drink","starch","other"} if unified else {"main","vegetable","soup"}
+            max_allowed = 1440 if unified else 240
+            if (role is not None and role not in allowed_roles
                     or visibility is not None and visibility not in {"visible","hidden","deleted"}
-                    or max_minutes is not None and (type(max_minutes) is not int or not 1<=max_minutes<=240)):
+                    or max_minutes is not None and (type(max_minutes) is not int or not 1<=max_minutes<=max_allowed)):
                 raise ProtocolError("INVALID_PAYLOAD", "invalid administrator recipe filters", request_id)
+            portion_filter = payload.get("portion_filter")
+            if portion_filter is not None and (not unified or portion_filter not in {"missing","structured","verified","estimated","needs_review"}):
+                raise ProtocolError("INVALID_PAYLOAD", "invalid portion filter", request_id)
+            portion_args = {"portion_filter": portion_filter} if portion_filter is not None else {}
             return success_response(request_id, {"dataset_version":version, **repository.admin_list_recipes(
-                connection,query,limit,offset,role=role,visibility=visibility,max_minutes=max_minutes)}), op
+                connection,query,limit,offset,role=role,visibility=visibility,max_minutes=max_minutes,**portion_args)}), op
         if op == "ADMIN_GET_RECIPE":
             revision_id=payload.get("revision_id")
             if set(payload)!={"revision_id"} or type(revision_id) is not int or not 1<=revision_id<2**64:
@@ -93,8 +373,19 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
         if op == "ADMIN_LIST_INGREDIENTS":
             from source.server.admin_ingredients import validate_list
             normalized=validate_list(payload,request_id)
+            if getattr(repository, "unified_catalog_mode", False):
+                return success_response(request_id, {"dataset_version":version,
+                    **repository.admin_list_ingredients(connection, **normalized)}), op
+            status=normalized.pop("status")
+            if status != "all":
+                raise ProtocolError("UNSUPPORTED_OPERATION", "ingredient status filtering is available in the unified catalog", request_id)
             return success_response(request_id,{"dataset_version":version,
                 **repository.admin_list_ingredients(connection,**normalized)}),op
+        if op == "ADMIN_LIST_UNITS":
+            if payload or not getattr(repository, "unified_catalog_mode", False):
+                raise ProtocolError("UNSUPPORTED_OPERATION", "unit catalog is available only in the unified recipe editor", request_id)
+            return success_response(request_id,{"dataset_version":version,
+                "items":repository.admin_list_units(connection)}),op
         if op == "ADMIN_LIST_USERS":
             from source.server.user_accounts import validate_admin_list
             options=validate_admin_list(payload,request_id)
@@ -171,12 +462,59 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
                 if exc.errno in (1142,1146,1227):raise ProtocolError("ADMIN_WRITE_DENIED","Admin writer lacks legacy ingredient overlay privileges",request_id)
                 raise
             return success_response(request_id,{"dataset_version":version,**result}),op
+        if op == "ADMIN_DELETE_RECIPE_PERMANENT":
+            expected = {"recipe_id", "confirm_user_content_delete", "expected_achievement_counts"}
+            counts = payload.get("expected_achievement_counts")
+            if (set(payload) != expected or not valid_public_id(payload.get("recipe_id"))
+                    or type(payload.get("confirm_user_content_delete")) is not bool
+                    or not isinstance(counts, dict) or set(counts) != {"posts", "comments", "images"}
+                    or any(type(counts.get(key)) is not int or counts[key] < 0 for key in ("posts", "comments", "images"))):
+                raise ProtocolError("INVALID_PAYLOAD", "invalid permanent recipe deletion confirmation", request_id)
+            if not getattr(repository, "unified_catalog_mode", False):
+                raise ProtocolError("UNSUPPORTED_OPERATION", "permanent deletion is available only in the unified catalog", request_id)
+            from source.server.repository import AdminDraftConflict
+            import mysql.connector
+            try:
+                result = repository.admin_permanently_delete_recipe(
+                    payload["recipe_id"],
+                    confirm_user_content_delete=payload["confirm_user_content_delete"],
+                    expected_achievement_counts=counts)
+            except AdminDraftConflict as exc:
+                raise ProtocolError("ADMIN_RECIPE_DELETE_BLOCKED", str(exc), request_id)
+            except mysql.connector.Error as exc:
+                if exc.errno in (1451, 1452):
+                    raise ProtocolError("ADMIN_RECIPE_DELETE_BLOCKED", "Món còn liên kết được khóa ngoại bảo vệ; transaction đã rollback.", request_id)
+                if exc.errno in (1044, 1045, 1142, 1227):
+                    raise ProtocolError("ADMIN_WRITE_DENIED", "Admin writer lacks permanent recipe deletion privileges", request_id)
+                raise
+            return success_response(request_id, {"dataset_version":version, **result}), op
+        if op == "ADMIN_DELETE_INGREDIENT_PERMANENT":
+            ingredient_id = payload.get("ingredient_id")
+            if set(payload) != {"ingredient_id"} or type(ingredient_id) is not int or not 1 <= ingredient_id < 2**64:
+                raise ProtocolError("INVALID_PAYLOAD", "invalid ingredient ID", request_id)
+            if not getattr(repository, "unified_catalog_mode", False):
+                raise ProtocolError("UNSUPPORTED_OPERATION", "permanent deletion is available only in the unified catalog", request_id)
+            from source.server.repository import AdminIngredientConflict
+            import mysql.connector
+            try:
+                result = repository.admin_permanently_delete_ingredient(ingredient_id)
+            except AdminIngredientConflict as exc:
+                raise ProtocolError("ADMIN_INGREDIENT_DELETE_BLOCKED", str(exc), request_id)
+            except mysql.connector.Error as exc:
+                if exc.errno in (1451, 1452):
+                    raise ProtocolError("ADMIN_INGREDIENT_DELETE_BLOCKED", "ingredient still has protected references", request_id)
+                if exc.errno in (1044, 1045, 1142, 1227):
+                    raise ProtocolError("ADMIN_WRITE_DENIED", "Admin writer lacks permanent ingredient deletion privileges", request_id)
+                raise
+            return success_response(request_id, {"dataset_version":version, **result}), op
         if op in {"ADMIN_SAVE_RECIPE","ADMIN_SET_RECIPE_LIFECYCLE"}:
             from source.server import admin_recipes
             from source.server.repository import AdminDraftConflict,AdminSchemaUnavailable,AdminWriteUnavailable
             try:
                 if op=="ADMIN_SAVE_RECIPE":
-                    normalized=admin_recipes.validate_save(payload,request_id,update="recipe_id" in payload)
+                    normalized=admin_recipes.validate_save(payload,request_id,update="recipe_id" in payload,
+                        allow_repeated=bool(getattr(repository,"supports_repeated_recipe_ingredients",False)),
+                        unified=bool(getattr(repository,"unified_catalog_mode",False)))
                     result=repository.admin_save_recipe(normalized,claims["sub"])
                 else:
                     normalized=admin_recipes.validate_state(payload,request_id)
@@ -291,19 +629,27 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
                         raise ProtocolError("ADMIN_IMAGE_CONFLICT", "recipe image metadata conflicts with another image", request_id)
                     raise
             return success_response(request_id, {"dataset_version": version, **result}), op
-        if op in {"ADMIN_UPDATE_LEGACY_RECIPE","ADMIN_SET_LEGACY_RECIPE_VISIBILITY"}:
+        if op in {"ADMIN_UPDATE_LEGACY_RECIPE","ADMIN_SET_LEGACY_RECIPE_VISIBILITY","ADMIN_RESTORE_RECIPE_SNAPSHOT"}:
             from source.server import legacy_recipe_overlays
             from source.server.repository import AdminDraftConflict,AdminSchemaUnavailable,AdminWriteUnavailable
             try:
-                normalized=(legacy_recipe_overlays.validate_update(payload,request_id)
-                    if op=="ADMIN_UPDATE_LEGACY_RECIPE" else legacy_recipe_overlays.validate_visibility(payload,request_id))
-                result=(repository.admin_update_legacy_recipe(normalized,claims["sub"])
-                    if op=="ADMIN_UPDATE_LEGACY_RECIPE" else repository.admin_set_legacy_recipe_visibility(normalized,claims["sub"]))
+                if op=="ADMIN_RESTORE_RECIPE_SNAPSHOT":
+                    from source.server.admin_recipe_snapshots import validate_restore
+                    normalized=validate_restore(payload,request_id)
+                    if normalized["kind"]=="legacy":
+                        result=repository.admin_restore_legacy_recipe_snapshot(normalized,claims["sub"])
+                    else:
+                        result=repository.admin_restore_v2_recipe_snapshot(normalized,claims["sub"])
+                else:
+                    normalized=(legacy_recipe_overlays.validate_update(payload,request_id)
+                        if op=="ADMIN_UPDATE_LEGACY_RECIPE" else legacy_recipe_overlays.validate_visibility(payload,request_id))
+                    result=(repository.admin_update_legacy_recipe(normalized,claims["sub"])
+                        if op=="ADMIN_UPDATE_LEGACY_RECIPE" else repository.admin_set_legacy_recipe_visibility(normalized,claims["sub"]))
             except ProtocolError:raise
             except AdminWriteUnavailable:
                 raise ProtocolError("ADMIN_WRITE_UNAVAILABLE","dedicated Admin writer is not configured",request_id)
             except AdminSchemaUnavailable:
-                raise ProtocolError("ADMIN_SCHEMA_UNAVAILABLE","legacy recipe overlay migration and grants are required",request_id)
+                raise ProtocolError("ADMIN_SCHEMA_UNAVAILABLE","recipe snapshot restore schema and grants are required",request_id)
             except AdminDraftConflict as exc:
                 raise ProtocolError("ADMIN_RECIPE_CONFLICT",str(exc),request_id)
             except ValueError:
@@ -363,7 +709,7 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
             unknown = set(payload) - {"query", "limit"}
             query = payload.get("query", "")
             limit = payload.get("limit", 20)
-            if unknown or not isinstance(query, str) or len(query.strip()) > 80 or not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 50:
+            if unknown or not isinstance(query, str) or len(query.strip()) > 80 or not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 250:
                 raise ProtocolError("INVALID_PAYLOAD", "invalid LIST_INGREDIENTS payload", request_id)
             return success_response(request_id, {"items": repository.list_ingredients(connection, query, limit), "dataset_version": version}), op
         if op == "GET_RECIPE":
@@ -392,7 +738,12 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
             if not repository.recipe_ids_exist(connection, options.recipe_ids):
                 raise ProtocolError("NOT_FOUND", "one or more recipes do not exist", request_id)
             catalog = repository.calculation_catalog(connection, options.recipe_ids)
-            data = meal_plan_calculation.calculate(options, catalog)
+            if options.occasion == "daily" and options.layout_mode == "automatic" and catalog.trust_admin_catalog:
+                from source.server.daily_demo_portions import calculate_daily
+                tags = repository.meal_pairing_metadata(connection, options.recipe_ids) if hasattr(repository,"meal_pairing_metadata") else {}
+                data = calculate_daily(options, catalog, tags)
+            else:
+                data = meal_plan_calculation.calculate(options, catalog)
             response = success_response(request_id, {"dataset_version": version, **data})
             try:
                 encode_frame(response)
@@ -407,20 +758,40 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
                 raise ProtocolError("INVALID_PAYLOAD", "filter catalog payload must be empty", request_id)
             recipes = repository.recipes_for_ranking(connection)
             classification = default_classification()
-            if hasattr(repository, "meal_classification"):
+            if hasattr(repository, "meal_classification_for_connection"):
+                classification = repository.meal_classification_for_connection(connection, classification)
+            elif hasattr(repository, "meal_classification"):
                 classification = repository.meal_classification(classification)
             catalog = repository.meal_preference_catalog(connection, recipes, classification)
             return success_response(request_id, {"dataset_version": version, **catalog.capabilities(layout_support=payload.get("layout_support",False))}), op
+        if op == "ASSESS_MEAL_PLAN":
+            from source.server.meal_context import assess
+            response=success_response(request_id, assess(repository, connection, payload, request_id, version))
+            try:
+                encode_frame(response)
+            except ProtocolError as exc:
+                if exc.code != "FRAME_LENGTH":raise
+                response=error_response(request_id,"RESULT_TOO_LARGE","Kết quả kiểm tra quá lớn; hãy giảm số món hoặc điều kiện và thử lại.")
+            return response, op
         if op == "GENERATE_MEAL_PLAN_V2":
             options = meal_plan_v2.validate(payload, request_id)
             if not repository.ingredient_ids_exist(connection, options.filters.selected | options.filters.excluded):
                 raise ProtocolError("INVALID_PAYLOAD", "ingredient ids are invalid", request_id)
             recipes = repository.recipes_for_ranking(connection)
             classification = default_classification()
-            if hasattr(repository, "meal_classification"):
+            if hasattr(repository, "meal_classification_for_connection"):
+                classification = repository.meal_classification_for_connection(connection, classification)
+            elif hasattr(repository, "meal_classification"):
                 classification = repository.meal_classification(classification)
             catalog = repository.meal_preference_catalog(connection, recipes, classification) if options.preferences else None
-            data = meal_plan_v2.generate(recipes, options, classification, request_id, catalog)
+            pairing_metadata = (repository.meal_pairing_metadata(connection, [row["id"] for row in recipes])
+                                if hasattr(repository, "meal_pairing_metadata") else {})
+            if options.adaptive_daily and hasattr(repository, "daily_prominent_ingredients"):
+                prominent = repository.daily_prominent_ingredients(connection, [row["id"] for row in recipes])
+                recipes = [dict(row, daily_prominent_ids=prominent.get(row["id"], set())) for row in recipes]
+            data = meal_plan_v2.generate(recipes, options, classification, request_id, catalog,
+                                         pairing_metadata=pairing_metadata,
+                                         daily_catalog=repository.calculation_catalog(connection, [r["id"] for r in recipes]) if options.adaptive_daily else None)
             if data["plan"] is not None:
                 details = [repository.get_recipe(connection, item["recipe_id"]) for item in data["plan"]["items"]]
                 if any(r is None for r in details):
@@ -440,8 +811,13 @@ def dispatch(repository: Repository, value: Any) -> tuple[dict[str, Any], str]:
             options = validate_meal_plan(payload, request_id)
             if not repository.ingredient_ids_exist(connection, options.selected | options.excluded):
                 raise ProtocolError("INVALID_PAYLOAD", "ingredient ids are invalid", request_id)
+            classification = default_classification()
+            if hasattr(repository, "meal_classification_for_connection"):
+                classification = repository.meal_classification_for_connection(connection, classification)
+            elif hasattr(repository, "meal_classification"):
+                classification = repository.meal_classification(classification)
             data = generate_meal_plan(repository.recipes_for_ranking(connection), options,
-                                      default_classification(), request_id)
+                                      classification, request_id)
             if data["plan"] is not None:
                 details = []
                 for item in data["plan"]["items"]:

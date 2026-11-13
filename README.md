@@ -1,5 +1,29 @@
 # Hôm nay ăn gì? — TCP Client–Server, UI v1.2.3
 
+> Demo công khai mới có **216 món ăn + 10 đồ uống**, catalog và ảnh được đóng gói
+> trong `data/demo/`. Khi clone mới, dùng [hướng dẫn demo unified](docs/DEMO_FRESH_CLONE.md)
+> và `.env.demo.example`. Các bước seed 50 món phía dưới là hướng dẫn legacy.
+
+## Bản demo unified v3 hiện tại (Windows)
+
+Khởi chạy website bằng `start_demo.bat` ở thư mục gốc. Launcher dùng database TEST_ONLY
+`goiy_v3_quality_final_20261110_test` trên MySQL `127.0.0.1:63900`, FastAPI cố định ở
+cổng `8000` và TCP Server cố định ở `127.0.0.1:9000`. Nó không tạo hoặc reset database;
+nếu cổng đang thuộc dịch vụ khác, launcher dừng an toàn và không tự tắt tiến trình đó.
+
+- User: <http://127.0.0.1:8000/>
+- Admin: <http://127.0.0.1:8000/admin>
+- Để dừng stack do launcher khởi chạy, nhấn `Ctrl+C` trong cửa sổ `start_demo.bat`.
+- FastAPI bind `0.0.0.0:8000` để thiết bị cùng mạng có thể truy cập bằng IPv4 Wi-Fi của máy.
+  TCP và MySQL chỉ bind loopback. Nếu Windows Firewall chặn máy khác trong mạng Private,
+  chạy một lần trong PowerShell mở bằng quyền Administrator:
+
+  ```powershell
+  New-NetFirewallRule -DisplayName 'GoiYMonAn Demo Web 8000' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8000 -Profile Private -RemoteAddress LocalSubnet
+  ```
+
+  Lệnh này chỉ cho phép cổng web trên mạng Private từ LocalSubnet.
+
 Đồ án môn Lập trình mạng bằng Python, phục vụ học tập và demo. Phiên bản giao diện **v1.2.3** có **50 món, 50 ảnh minh họa riêng và 150 WebP** (320/640/960px). Có hai chế độ: gợi ý từ nguyên liệu và tìm món theo tên khi chưa chọn nguyên liệu. Kết quả, bộ lọc và trang được khôi phục khi Back/reload.
 
 ```text
@@ -208,3 +232,33 @@ statics/runtime/ Log chạy mới, bị Git bỏ qua
 ```
 
 Lộ trình đọc cho giảng viên: **README này → [mục lục tài liệu](docs/README.md) → [giao thức/tìm kiếm hiện tại](docs/V1_2_SEARCH.md) → [bằng chứng báo cáo](EXPERIMENT_RESULTS.md)**. Tài liệu migration và khảo sát ảnh là hồ sơ phát triển, không phải các bước bắt buộc để demo.
+
+
+## Unified schema v3 (isolated TEST_ONLY)
+
+The v3 repository is opt-in and is exercised against a separate MySQL database. Do not set these values in the production service environment. Point both processes at a disposable, already prepared `*_test` database; keep the old database intact for rollback.
+
+TCP Server terminal:
+
+```powershell
+$env:TCP_DB_SCHEMA = 'unified_v3'
+$env:MYSQL_DATABASE = 'goiy_v3_test'
+$env:TCP_HOST = '127.0.0.1'
+$env:TCP_PORT = '9012'
+$env:TCP_LOG_PATH = 'statics/runtime/tcp_server_v3_test.jsonl'
+.\.venv\Scripts\python.exe -m source.server.main
+```
+
+FastAPI terminal:
+
+```powershell
+$env:UNIFIED_SCHEMA_MODE = '1'
+$env:MYSQL_DATABASE = 'goiy_v3_test'
+$env:TCP_HOST = '127.0.0.1'
+$env:TCP_PORT = '9012'
+.\.venv\Scripts\python.exe -m uvicorn source.web.main:app --host 127.0.0.1 --port 8012
+```
+
+Open `http://127.0.0.1:8012/`. This mode keeps the existing Browser -> FastAPI -> TCP -> MySQL architecture and the TCP protocol. Structured portion calculation uses only numeric ingredient rows with a known unit and base servings; text such as ?to taste? stays incomplete. Unit totals are combined only when ingredient, form, measurement basis, purpose, unit, and required/optional status all match. No unit conversion is inferred.
+
+The default runtime remains the existing schema until a separately approved production cutover. Legacy and v2 compatibility code is still used by that runtime and its regression tests, so it must not be removed yet. The isolated v3 integration test is `tests/test_unified_http_tcp.py`.

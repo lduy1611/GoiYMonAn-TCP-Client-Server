@@ -267,6 +267,10 @@ def readonly_repository(connection, config, omit=None):
     user = "v2_test_" + uuid.uuid4().hex[:12]
     database = config["database"]
     sql(connection, f"CREATE USER '{user}'@'127.0.0.1' IDENTIFIED BY 'TEST_ONLY_local_fixture_123!'")
+    if omit is None:
+        # Schema SELECT permits probing absent optional migration tables;
+        # table-only grants make MySQL mask absence as permission error 1142.
+        sql(connection,f"GRANT SELECT ON `{database}`.* TO '{user}'@'127.0.0.1'")
     for row in sql(connection, "SHOW TABLES"):
         table = next(iter(row.values()))
         if table != omit:
@@ -292,7 +296,7 @@ def test_real_mysql_tcp_http_with_select_only_runtime_and_database_error(mysql_d
                 with TestClient(app) as web:
                     response = web.post('/api/meal-plan/calculate', json={"recipe_ids": [1, 2], "people": 4})
                 if omitted is None:
-                    assert response.status_code == 200 and response.json()["data"]["status"] == "COMPLETE"
+                    assert response.status_code == 200 and response.json()["data"]["status"] == "COMPLETE", response.text
                     assert response.json()["data"]["known_ingredients"][0]["quantity_value"] == "250"
                 else:
                     assert response.status_code == 503 and response.json()["error"]["code"] == "DB_ERROR"

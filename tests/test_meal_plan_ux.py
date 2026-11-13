@@ -135,11 +135,14 @@ def test_detail_return_link_allowlist(meal_web,query,expected):
         def __init__(self): super().__init__();self.links={}
         def handle_starttag(self,tag,attrs):
             a=dict(attrs)
-            if tag=='a' and a.get('class') in {'back','header-link'}:self.links[a['class']]=a['href']
+            if tag=='a' and a.get('class')=='back':self.links['back']=a['href']
+            if tag=='a' and a.get('class')=='brand':self.links['brand']=a['href']
+            if tag=='a' and a.get('data-user-tab')=='meal':self.links['meal-nav']=a['href']
     page=meal_web[0].get('/recipes/1'+query)
     assert page.status_code==200
     parser=Links();parser.feed(page.text)
-    assert parser.links=={'back':expected,'header-link':expected}
+    # The context return is allowlisted; the shared navigation stays canonical.
+    assert parser.links=={'back':expected,'brand':'/','meal-nav':'/meal-plan'}
 
 
 @pytest.mark.parametrize('recipe_id',['0','-1','invalid','99999999999999999'])

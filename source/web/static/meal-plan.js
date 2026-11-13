@@ -53,7 +53,7 @@
       new Set(list.map(i => i?.ingredient_id)).size === list.length && list.every(i => i && state.names.get(i.ingredient_id) === i.name &&
         !c.ingredient_ids.includes(i.ingredient_id) && !c.excluded_ids.includes(i.ingredient_id) &&
         Array.isArray(i.uses) && i.uses.length >= 1 && i.uses.length <= 3 && new Set(i.uses.map(u => u?.recipe_id)).size === i.uses.length &&
-        i.uses.every(u => u && recipeIDs.includes(u.recipe_id) && typeof u.quantity === 'string' && u.quantity.length <= 255 && typeof u.is_required === 'boolean') &&
+        i.uses.every(u => u && recipeIDs.includes(u.recipe_id) && (u.quantity === null || typeof u.quantity === 'string' && u.quantity.length <= 255) && typeof u.is_required === 'boolean') &&
         i.uses.some(u => u.is_required) === required);
     return validateShopping(p.shopping_list,true) && validateShopping(p.optional_shopping_list,false) &&
       same(p.shopping_list.map(i => i.ingredient_id),p.missing_ids) &&
@@ -185,10 +185,10 @@
     $('meal-ingredients').setAttribute('aria-busy','true');
     $('meal-load-retry').classList.add('hidden');
     try {
-      const response = await fetch('/api/ingredients?limit=50');
+      const response = await fetch('/api/ingredients?limit=250');
       const envelope = await response.json();
       const data = envelope.data;
-      if (!response.ok || !envelope.ok || !text(data?.dataset_version) || !Array.isArray(data.items) || data.items.length > 50 ||
+      if (!response.ok || !envelope.ok || !text(data?.dataset_version) || !Array.isArray(data.items) || data.items.length > 250 ||
           !data.items.every(i => i && Number.isSafeInteger(i.id) && i.id > 0 && text(i.name)) || new Set(data.items.map(i => i.id)).size !== data.items.length) throw Error('Không tải được danh sách nguyên liệu.');
       state.names = new Map(data.items.map(i => [i.id,i.name]));
       state.dataset = data.dataset_version;

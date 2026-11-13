@@ -144,6 +144,7 @@ def test_admin_draft_gateway_requires_csrf_and_validates_before_tcp(monkeypatch)
         assert client.post("/api/admin/revisions",json=body,headers={"X-CSRF-Token":csrf}).status_code==200
         assert calls[-1][0]=="ADMIN_CREATE_DRAFT"
         assert calls[-1][1]["admin_token"]
+        assert calls[-1][1]['ingredients']==[{'ingredient_id':1,'quantity_raw':None,'requirement':'unknown'}]
 
 
 def test_admin_create_distinguishes_expired_session_csrf_and_writer_denial(monkeypatch):

@@ -24,10 +24,32 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 LOG_PATH = Path(os.getenv("TCP_LOG_PATH", "statics/runtime/tcp_server.jsonl"))
 
 
+def configured_tcp_max_connections() -> int:
+    """Keep TCP worker concurrency within the eagerly opened MySQL pool."""
+    unified = os.getenv("TCP_DB_SCHEMA", "legacy").casefold() == "unified_v3"
+    pool_variable = "UNIFIED_TCP_DB_POOL_SIZE" if unified else "TCP_DB_POOL_SIZE"
+    try:
+        pool_size = int(os.getenv(pool_variable, "4"))
+        requested = int(os.getenv("TCP_MAX_CONNECTIONS", str(pool_size)))
+    except ValueError:
+        raise RuntimeError("TCP pool and connection limits must be integers") from None
+    if not 1 <= pool_size <= 64 or not 1 <= requested <= pool_size:
+        raise RuntimeError("TCP_MAX_CONNECTIONS must be between 1 and the configured MySQL pool size")
+    return requested
+
+
 class TCPServer:
     def __init__(self, host: str = "127.0.0.1", port: int = 9000, db_path: str | Path | None = None, max_connections: int = 32, repository: Any | None = None):
         self.host, self.port = host, port
-        self.repository = repository or (Repository(db_path) if db_path is not None else MySQLRepository.from_env())
+        if repository is not None:
+            self.repository = repository
+        elif db_path is not None:
+            self.repository = Repository(db_path)
+        elif os.getenv("TCP_DB_SCHEMA", "legacy").casefold() == "unified_v3":
+            from source.server.unified_repository import UnifiedMySQLRepository
+            self.repository = UnifiedMySQLRepository.from_env()
+        else:
+            self.repository = MySQLRepository.from_env()
         self.max_connections = max_connections
         self.slots = threading.BoundedSemaphore(max_connections)
         self.stop_event = threading.Event()
@@ -130,10 +152,12 @@ class TCPServer:
                                   service_ms=round((time.monotonic() - started) * 1000, 3),
                                   bytes_in=bytes_in, bytes_out=bytes_out, dataset_version=None)
                         recoverable = exc.code in {
-                            "UNKNOWN_OPERATION", "INVALID_PAYLOAD", "NOT_FOUND",
+                            "UNKNOWN_OPERATION", "UNSUPPORTED_OPERATION", "INVALID_PAYLOAD", "NOT_FOUND",
                             "ADMIN_UNAUTHORIZED", "ADMIN_WRITE_DENIED", "ADMIN_DRAFT_CONFLICT", "ADMIN_RECIPE_CONFLICT",
-                            "ADMIN_INGREDIENT_CONFLICT",
+                            "ADMIN_INGREDIENT_CONFLICT", "ADMIN_RECIPE_DELETE_BLOCKED", "ADMIN_INGREDIENT_DELETE_BLOCKED",
+                            "ADMIN_TAXONOMY_CONFLICT",
                             "ADMIN_WRITE_UNAVAILABLE", "ADMIN_SCHEMA_UNAVAILABLE",
+                            "FORBIDDEN", "ACHIEVEMENT_CONFLICT",
                             "DB_UNAVAILABLE", "ADMIN_RECIPE_CONSTRAINT", "ADMIN_RECIPE_INVALID_DATA",
                             "USER_ACCOUNT_CONFLICT", "USER_ACCOUNT_UNAVAILABLE", "USER_UNAUTHORIZED", "USER_LOCKED",
                         } and exc.request_id is not None
@@ -213,7 +237,8 @@ class TCPServer:
 
 
 def main() -> None:
-    TCPServer(os.getenv("TCP_HOST", "127.0.0.1"), int(os.getenv("TCP_PORT", "9000"))).serve_forever()
+    TCPServer(os.getenv("TCP_HOST", "127.0.0.1"), int(os.getenv("TCP_PORT", "9000")),
+              max_connections=configured_tcp_max_connections()).serve_forever()
 
 
 if __name__ == "__main__":

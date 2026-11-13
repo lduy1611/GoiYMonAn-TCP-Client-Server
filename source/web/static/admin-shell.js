@@ -6,7 +6,11 @@
     overview:{title:'Tổng quan',eyebrow:'TỔNG QUAN',description:'Theo dõi danh mục món ăn, nguyên liệu và tài khoản từ dữ liệu MySQL.'},
     recipes:{title:'Quản lý món ăn',eyebrow:'NỘI DUNG',description:'Tìm, xem, chỉnh sửa và quản lý món đang hiển thị.'},
     ingredients:{title:'Nguyên liệu',eyebrow:'DANH MỤC BẾP',description:'Quản lý thành phần đang được sử dụng trong công thức.'},
+    'dish-types':{title:'Loại món',eyebrow:'DANH MỤC MÂM CƠM',description:'Quản lý loại món và gắn nhiều loại phù hợp với từng công thức.'},
+    classifications:{title:'Phân loại món',eyebrow:'METADATA CÔNG THỨC',description:'Quản lý vùng miền, chế độ ăn, hoàn cảnh, thời tiết, cách chế biến và nguyên liệu chính.'},
     users:{title:'Người dùng',eyebrow:'TÀI KHOẢN',description:'Tìm kiếm tài khoản, kiểm tra trạng thái và vai trò.'}
+    ,achievements:{title:'Quản lý thành quả',eyebrow:'BÀI ĐĂNG',description:'Xem bài đăng, ảnh và bình luận của người dùng.'},
+    feedback:{title:'Qu\u1ea3n l\u00fd g\u00f3p \u00fd',eyebrow:'PH\u1ea2N H\u1ed2I',description:'Xem v\u00e0 x\u1eed l\u00fd g\u00f3p \u00fd g\u1eedi t\u1eeb kh\u00e1ch v\u00e0 ng\u01b0\u1eddi d\u00f9ng.'}
   };
   const mobile=window.matchMedia('(max-width: 900px)');
   function navigate(view,{save=true}={}){

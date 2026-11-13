@@ -132,7 +132,9 @@ def test_admin_draft_create_edit_runs_through_tcp_on_private_test_database(mysql
             user_catalog = client.request("LIST_INGREDIENTS", {"query": "", "limit": 50})["data"]["items"]
             assert {row["id"]: row["name"] for row in user_catalog}[1] == "C\u00e1 basa"
             assert {row["id"]: row["name"] for row in user_catalog}[2] == "G\u1eebng"
-            assert any(row["id"] == V2_OFFSET + 11 for row in user_catalog)
+            # Imported NEEDS_VERIFICATION identities may be referenced by an
+            # Admin draft, but they stay out of the public ingredient picker.
+            assert not any(row["id"] == V2_OFFSET + 11 for row in user_catalog)
             hidden_search = client.request("SEARCH_RECIPES", {"query": "TEST_ONLY admin recipe", "limit": 20})
             assert hidden_search["ok"] and hidden_search["data"]["total"] == 0
             by_legacy_ingredient = client.request("SEARCH_RECIPES", {"ingredient_ids": [1], "limit": 20})
@@ -194,7 +196,7 @@ def test_draft_crosswalk_uses_schema_default_without_extra_status_grant_test_onl
     from source.common.catalog_ids import V2_OFFSET
     from source.database.migrate_v2 import (run, run_admin_draft_migration,
         run_admin_ingredient_migration, run_legacy_recipe_overlay_migration,
-        run_legacy_ingredient_admin_migration)
+        run_legacy_ingredient_admin_migration, run_admin_recipe_catalog_migration)
 
     connection, config = mysql_db
     assert connection.database.startswith("goiy_v2_test_")
@@ -203,11 +205,13 @@ def test_draft_crosswalk_uses_schema_default_without_extra_status_grant_test_onl
     run_admin_ingredient_migration(connection, "apply")
     run_legacy_recipe_overlay_migration(connection, "apply")
     run_legacy_ingredient_admin_migration(connection, "apply")
+    run_admin_recipe_catalog_migration(connection, "apply")
     writer_user = "TEST_ONLY_draft_writer"
     writer_password = "TEST_ONLY_writer_password_42!"
     principal = f"'{writer_user}'@'127.0.0.1'"
     grants = [
             f"GRANT SELECT (id,name) ON `{connection.database}`.`ingredients` TO {principal}",
+        f"GRANT SELECT, INSERT, UPDATE ON `{connection.database}`.`v2_admin_recipe_catalog_overrides` TO {principal}",
         f"GRANT SELECT ON `{connection.database}`.`v2_admin_legacy_ingredient_overrides` TO {principal}",
         f"GRANT SELECT ON `{connection.database}`.`v2_ingredient_admin_state` TO {principal}",
         f"GRANT SELECT ON `{connection.database}`.`v2_ingredients` TO {principal}",
@@ -259,7 +263,7 @@ def test_draft_crosswalk_uses_schema_default_without_extra_status_grant_test_onl
             validate_writer_grants(actual_grants, draft_only=True, database=connection.database)
             assert repo.admin_draft_writer_ready() is True
             saved = client.post("/api/admin/revisions", json=payload, headers={"X-CSRF-Token": csrf})
-            assert saved.status_code == 200, saved.json()
+            assert saved.status_code == 200, saved.text
             revision_id = saved.json()["data"]["revision_id"]
             reopened = client.get(f"/api/admin/revisions/{revision_id}")
             assert reopened.status_code == 200

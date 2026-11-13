@@ -4,26 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page_title }}</title>
-  <link rel="stylesheet" href="/static/styles.css?v=accounts-20261106">
+  <link rel="stylesheet" href="/static/styles.css?v=feedback-widget-20261111">
 </head>
 <body>
   <a class="skip-link" href="#recommend-form">Đến phần chọn nguyên liệu</a>
-  <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span><span>Hôm nay ăn gì?<small>Từ nguyên liệu trong căn bếp của bạn</small></span></a>
-    <div class="topbar-actions"><span class="status-pill" id="server-status" role="status">Đang kiểm tra kết nối…</span><nav id="account-entry" class="account-entry" aria-label="Tài khoản"><a class="account-nav-link" href="/account/login">Đăng nhập</a></nav></div>
-  </header>
+  {% include "_user_header.html" %}
   <main class="container">
     <section class="hero">
       <p class="eyebrow">Ít phân vân hơn, thêm một bữa ngon</p>
       <h1 id="hero-title">Có nguyên liệu gì,<br>mình nấu món đó.</h1>
       <p class="hero-copy" id="hero-copy">Chọn những gì bạn đang có. Tìm món phù hợp và biết rõ cần chuẩn bị thêm gì.</p>
+      <span class="status-pill page-status" id="server-status" role="status">Đang kiểm tra kết nối…</span>
       <ol class="journey" id="journey" aria-label="Cách sử dụng"><li><span>1</span> Chọn nguyên liệu</li><li><span>2</span> Tìm món phù hợp</li><li><span>3</span> Xem cách nấu</li></ol>
     </section>
-    <p class="results-context"><a class="route-link" href="/meal-plan">🍽 Mâm cơm hôm nay</a></p>
-    <div class="mode-switch" role="group" aria-label="Cách tìm món">
-      <button type="button" id="mode-search" aria-pressed="false">Tìm món theo tên</button>
-      <button type="button" id="mode-recommend" aria-pressed="true">Gợi ý theo nguyên liệu</button>
-    </div>
     <section class="workspace">
       <form id="recommend-form" class="panel controls" aria-labelledby="controls-title" tabindex="-1">
         <fieldset id="ingredient-controls">
@@ -68,7 +61,6 @@
   </main>
   <footer>Gợi ý mang tính tham khảo · Kiểm tra thành phần và dị ứng trước khi sử dụng</footer>
   <script src="/static/recipe-images.js?v=images-admin-20261107" defer></script>
-  <script src="/static/app.js?v=ui-1.2.4" defer></script>
-  <script src="/static/account-menu.js?v=accounts-20261106" defer></script>
+  <script src="/static/app.js?v=user-shell-restore-20261113" defer></script>
 </body>
 </html>

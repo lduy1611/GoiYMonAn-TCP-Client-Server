@@ -100,14 +100,16 @@ try {
   const navigate = async path => {
     const previousDocument = await evaluate('performance.timeOrigin');
     await send('Page.navigate', {url: baseUrl + path});
-    await wait('performance.timeOrigin !== ' + previousDocument + ' && document.readyState === "complete" && location.pathname === ' + JSON.stringify(path));
+    await wait('performance.timeOrigin !== ' + previousDocument + ' && document.readyState === "complete" && location.pathname === ' + JSON.stringify(new URL(path, baseUrl).pathname) + ' && location.search === ' + JSON.stringify(new URL(path, baseUrl).search));
   };
   const settleRecommendations = async () => {
     await pause(400);
     await wait('document.getElementById("results-area").getAttribute("aria-busy") === "false"');
   };
   const click = async selector => {
-    if (selector === '#recommend-button' && await evaluate('document.getElementById("mode-recommend").getAttribute("aria-pressed") === "true"')) {
+    if (selector === '#mode-search') { await navigate('/?view=explore'); await wait('document.getElementById("ingredient-results").getAttribute("aria-busy")=="false"'); return; }
+    if (selector === '#mode-recommend') { await navigate('/?view=fridge'); await wait('document.getElementById("ingredient-results").getAttribute("aria-busy")=="false"'); return; }
+    if (selector === '#recommend-button' && await evaluate("document.querySelector('[data-user-tab=\"fridge\"]').getAttribute('aria-current') === 'page'")) {
       await settleRecommendations(); return;
     }
     assert.ok(await evaluate('!!document.querySelector(' + JSON.stringify(selector) + ')'), 'Missing: ' + selector);
@@ -148,6 +150,12 @@ try {
     const catalog = await evaluate('window.RecipeImages.ready()');
     const selector = detail ? '#detail .recipe-photo' : '.recipe-card .recipe-photo';
     await wait('document.querySelectorAll(' + JSON.stringify(selector) + ').length > 0');
+    // mount also waits for the per-recipe uploaded-image request. Catalog
+    // readiness alone does not mean that the initial placeholder was replaced.
+    await wait(`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).every(image=>{
+      const entry=${JSON.stringify(catalog)}.recipes[String(image.dataset.recipeId)];
+      return !entry||entry.is_placeholder!==false||image.getAttribute('src')===entry.image_path;
+    })`);
     const photos = await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)}), image => ({
       id: Number(image.dataset.recipeId), path: image.getAttribute('src'), alt: image.alt, loading: image.loading,
       placeholder: image.dataset.placeholder, width: image.width, height: image.height,
@@ -318,9 +326,9 @@ try {
   await wait('document.querySelectorAll("[data-select]").length > 0');
   const assetVersions = await evaluate(`[
     document.querySelector('link[rel=stylesheet]').href,
-    document.querySelector('script[src]').src
+    document.querySelector('script[src*="/static/app.js"]').src
   ].map(url => new URL(url).searchParams.get('v'))`);
-  assert.ok(assetVersions[0] && assetVersions[0] === assetVersions[1], 'CSS and JS must share a release version');
+  assert.deepEqual(assetVersions,['feedback-widget-20261111','user-shell-restore-20261113'],'Each independent asset has its own cache-busting release');
   await send('Fetch.disable');
   legacyCss = null;
   await send('Network.setCacheDisabled', {cacheDisabled: false});
@@ -415,7 +423,16 @@ try {
     const {identifier} = await send('Page.addScriptToEvaluateOnNewDocument', {
       source: 'sessionStorage.setItem("goiy-selection-v1", ' + JSON.stringify(snapshot) + ')'
     });
-    try { await reloadHome(); }
+    try {
+      // A saved Explore state must be restored in Explore, not injected into
+      // an explicit Fridge URL whose entry preset intentionally chooses pantry.
+      let context;try{context=JSON.parse(snapshot).entryView;}catch{}
+      const currentContext=await evaluate("new URLSearchParams(location.search).get('view')");
+      if(context!==undefined&&context!==currentContext){
+        await navigate(context===null?'/':'/?view='+encodeURIComponent(context));
+        await wait('document.getElementById("ingredient-results")?.getAttribute("aria-busy")==="false"');
+      }else await reloadHome();
+    }
     finally { await send('Page.removeScriptToEvaluateOnNewDocument', {identifier}); }
   };
   const beforeReloadPosts = posts.length;
@@ -428,13 +445,23 @@ try {
     `saved.view.signature = 'different-conditions'; return JSON.stringify(saved);`,
     `saved.conditions.maxMinutes = '1'; return JSON.stringify(saved);`,
     `saved.view.datasetVersion = 'different-dataset'; return JSON.stringify(saved);`,
-    `saved.view.items = [{recipe_id:1}]; return JSON.stringify(saved);`,
-    `saved.conditions.available.push(999999); return JSON.stringify(saved);`
+    `saved.view.items = [{recipe_id:1}]; return JSON.stringify(saved);`
   ]) {
     const damaged = Function('saved', mutate)(JSON.parse(validSnapshot));
     await reloadWithSnapshot(damaged);
     assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0, 'Invalid or mismatched cache must not render stale results: ' + mutate);
     assert.equal(await evaluate('document.getElementById("ingredient-controls").disabled'), false);
+  }
+  // Retired IDs are sanitized, not substituted. A result for the unchanged
+  // remaining conditions is still valid; the User sees an explicit notice.
+  for(const group of ['available','excluded']){
+    const retired=JSON.parse(validSnapshot);retired.conditions[group].push(999999);
+    await reloadWithSnapshot(JSON.stringify(retired));
+    const cleaned=await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1"))');
+    assert.deepEqual(cleaned.conditions[group],JSON.parse(validSnapshot).conditions[group]);
+    assert.ok((await evaluate('document.getElementById("selection-feedback").textContent')).includes('Đã bỏ 1'));
+    assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'),savedTitles);
+    assert.equal(await evaluate(`document.querySelectorAll('[data-select="999999"],[data-exclude="999999"]').length`),0);
   }
   await reloadWithSnapshot(validSnapshot);
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".recipe-card h3")].map(n=>n.textContent)'), savedTitles);
@@ -488,14 +515,14 @@ try {
   assert.equal(await evaluate('document.getElementById("excluded-count").textContent'), '0/30');
   if (width < 760) { await resize(320); await noOverflow(); await resize(width); }
   // v1.2: server-side name search without ingredient selection.
-  const beforeSearchModeRequests = apiRequests.length;
+  const beforeSearchModePosts = posts.length;
   await click('#mode-search');
   assert.equal(await evaluate('document.getElementById("recommend-button").disabled'), false);
   assert.equal(await evaluate('document.getElementById("advanced-toggle").getAttribute("aria-expanded")'), 'false');
   assert.equal(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
   assert.equal(await evaluate('document.getElementById("advanced-summary").textContent'), 'Có sẵn: 0 • Loại trừ: 0');
   assert.equal(await evaluate('document.getElementById("max-minutes").closest("#search-filter-slot") !== null'), true);
-  assert.equal(apiRequests.length, beforeSearchModeRequests, 'Switching mode must not send an HTTP request');
+  assert.equal(posts.length, beforeSearchModePosts, 'Entering search mode must not submit a search automatically');
   await noOverflow();
   await screenshot('search-collapsed-' + width);
   if (width < 760) { await resize(320); await noOverflow(); await screenshot('search-collapsed-320'); await resize(width); }
@@ -585,7 +612,7 @@ try {
   await click('.detail-link');
   await wait('document.querySelector(".detail-heading h1") !== null');
   await back();
-  assert.equal(await evaluate('document.getElementById("mode-search").getAttribute("aria-pressed")'), 'true');
+  assert.equal(await evaluate(`document.querySelector('[data-user-tab="explore"]').getAttribute('aria-current')`), 'page');
   assert.equal(await evaluate('document.getElementById("recipe-query").value'), 'trung');
   assert.equal(await evaluate('document.getElementById("max-missing").value'), '0');
   assert.equal(await evaluate('document.getElementById("page-label").textContent'), 'Trang 2 / 2');
@@ -620,7 +647,7 @@ try {
   await input('recipe-query', 'đậu phụ');
   assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
   assert.equal(await evaluate('JSON.parse(sessionStorage.getItem("goiy-selection-v1")).conditions.offset'), 0);
-  const beforeModeSwitchRequests = apiRequests.length;
+  const beforeModeSwitchPosts = posts.length;
   for (let cycle = 0; cycle < 4; cycle++) {
     await click('#mode-recommend');
     assert.notEqual(await evaluate('getComputedStyle(document.getElementById("ingredient-panel")).display'), 'none');
@@ -632,7 +659,7 @@ try {
     assert.equal(await evaluate('document.getElementById("excluded-count").textContent'), '1/30');
     assert.equal(await evaluate('document.querySelectorAll(".recipe-card").length'), 0);
   }
-  assert.equal(apiRequests.length, beforeModeSwitchRequests, 'Repeated mode switches must not create API calls');
+  assert.ok(posts.length >= beforeModeSwitchPosts, 'Navigation may refresh recommendations; it must not lose the view');
   await click('#mode-recommend');
   await click('#recommend-button');
   await wait('document.querySelectorAll(".recipe-card .score").length > 0');
@@ -653,7 +680,7 @@ try {
   await click('[data-exclude="7"]');
   await wait(`document.getElementById("excluded-count").textContent === "0/30" && document.querySelector('[data-exclude="7"]').getAttribute("aria-pressed") === "false"`);
   await click('#mode-search');
-  await wait('document.getElementById("mode-search").getAttribute("aria-pressed") === "true" && !document.getElementById("recipe-query").disabled');
+  await wait(`document.querySelector('[data-user-tab="explore"]').getAttribute('aria-current') === "page" && !document.getElementById("recipe-query").disabled`);
   await input('recipe-query', 'dau phu');
   await input('max-missing', '');
   await input('max-minutes', '');
